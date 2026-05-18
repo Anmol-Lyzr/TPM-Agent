@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { upsertSession } from "@/lib/db/sessions";
 import { callAgent, createSessionId } from "@/lib/lyzr";
 import { parseAgentResponse } from "@/lib/parseAgentResponse";
 
@@ -58,10 +59,31 @@ export async function POST(req: NextRequest) {
 
     const parsed = parseAgentResponse(reply);
 
+    let persisted = false;
+    let persistError: string | undefined;
+    try {
+      await upsertSession(returnedSessionId, {
+        parsed,
+        rawReply: reply,
+        transcript:
+          mode === "analyze" && typeof body.transcript === "string"
+            ? body.transcript
+            : undefined,
+      });
+      persisted = true;
+    } catch (dbErr) {
+      const msg =
+        dbErr instanceof Error ? dbErr.message : "MongoDB persist failed";
+      persistError = msg;
+      console.error("Failed to persist session to MongoDB:", dbErr);
+    }
+
     return NextResponse.json({
       reply,
       session_id: returnedSessionId,
       parsed,
+      persisted,
+      persist_error: persistError,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

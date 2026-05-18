@@ -1,0 +1,168 @@
+"use client";
+
+import { Calendar, FileText, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { cn } from "@/lib/cn";
+import type { SessionListItem } from "@/lib/sessionStore";
+
+function formatWhen(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function StatPill({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+      {label} {value}
+    </span>
+  );
+}
+
+export function SessionListPanel({
+  sessions,
+  listLoading,
+  listError,
+  selectedSessionId,
+  detailLoading,
+  onSelect,
+  onRefresh,
+  onDelete,
+  deletingSessionId,
+}: {
+  sessions: SessionListItem[];
+  listLoading: boolean;
+  listError: string | null;
+  selectedSessionId: string | null;
+  detailLoading: boolean;
+  deletingSessionId: string | null;
+  onSelect: (sessionId: string) => void;
+  onRefresh: () => void;
+  onDelete: (sessionId: string, title: string) => void;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-[var(--z-border)] px-4 py-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">Saved sessions</h1>
+            <p className="mt-0.5 text-xs text-slate-500">
+              All TPM sessions stored in MongoDB. Select one to view.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={listLoading}
+            title="Refresh list"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--z-border)] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={cn("h-4 w-4", listLoading && "animate-spin")}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+        {listError ? (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+            {listError}
+          </p>
+        ) : null}
+
+        {listLoading && sessions.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--z-brand)]" />
+            Loading sessions…
+          </div>
+        ) : null}
+
+        {!listLoading && sessions.length === 0 && !listError ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 text-center text-sm text-slate-500">
+            <FileText className="h-8 w-8 text-slate-300" />
+            <p>No saved sessions yet.</p>
+            <p className="text-xs">
+              Analyze a transcript in the workspace to create one.
+            </p>
+          </div>
+        ) : null}
+
+        {sessions.length > 0 ? (
+          <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
+            {sessions.map((session) => {
+              const selected = session.sessionId === selectedSessionId;
+              const loadingThis = selected && detailLoading;
+              const deleting = deletingSessionId === session.sessionId;
+
+              return (
+                <li
+                  key={session.sessionId}
+                  className={cn(
+                    "flex overflow-hidden rounded-lg border transition-colors",
+                    selected
+                      ? "border-[var(--z-brand)] bg-teal-50/80 ring-1 ring-[var(--z-brand)]/30"
+                      : "border-[var(--z-border)] bg-white",
+                    detailLoading && !selected && "opacity-50",
+                    deleting && "opacity-60"
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelect(session.sessionId)}
+                    disabled={(detailLoading && !selected) || deleting}
+                    className="min-w-0 flex-1 px-3 py-3 text-left hover:bg-slate-50/80 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-sm font-medium text-slate-900">
+                        {session.title}
+                      </p>
+                      {loadingThis ? (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--z-brand)]" />
+                      ) : null}
+                    </div>
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {formatWhen(session.updatedAt)}
+                    </p>
+                    <p className="mt-2 flex flex-wrap gap-1.5">
+                      <StatPill label="Plan" value={session.planCount} />
+                      <StatPill label="Issues" value={session.issuesCount} />
+                      <StatPill label="Tasks" value={session.tasksCount} />
+                      {session.hasTranscript ? (
+                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                          Transcript
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="mt-2 truncate font-mono text-[10px] text-slate-400">
+                      {session.sessionId}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete session"
+                    disabled={Boolean(deletingSessionId)}
+                    onClick={() => onDelete(session.sessionId, session.title)}
+                    className="flex w-10 shrink-0 items-center justify-center border-l border-[var(--z-border)] text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
+    </div>
+  );
+}

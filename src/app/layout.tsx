@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TPM Agent · Meeting Intelligence",
+  title: "TPM Agent · Dashboard",
   description:
-    "Parse MS Teams transcripts into project plans, Jira issues, tasks, and meeting minutes",
+    "TPM meeting intelligence — dashboard overview and workspace for plans, Jira issues, tasks, and minutes",
 };
 
 export default function RootLayout({

@@ -16,9 +16,8 @@ import {
   applyMomSave,
   applyProjectPlanSave,
   applyTasksSave,
-  cloneParsed,
+  cloneTabSnapshot,
   getTabSnapshot,
-  persistParsed,
 } from "@/lib/dashboardState";
 import {
   canExportIssues,
@@ -78,6 +77,9 @@ export function DashboardTabs({
   hasRun,
   showEmpty,
   onRefine,
+  readOnly = false,
+  loadingMessage,
+  loadingSubmessage,
 }: {
   parsed: ParsedAgentResponse;
   onParsedChange: (next: ParsedAgentResponse) => void;
@@ -85,7 +87,14 @@ export function DashboardTabs({
   isLoading: boolean;
   hasRun: boolean;
   showEmpty: boolean;
-  onRefine: (prompt: string, activeTab: DashboardTabId) => Promise<void>;
+  onRefine?: (
+    prompt: string,
+    activeTab: DashboardTabId,
+    snapshot: unknown
+  ) => Promise<void>;
+  readOnly?: boolean;
+  loadingMessage?: string;
+  loadingSubmessage?: string;
 }) {
   const [activeTab, setActiveTab] = useState<DashboardTabId>("plan");
   const [isEditing, setIsEditing] = useState(false);
@@ -103,32 +112,32 @@ export function DashboardTabs({
   }, [parsed, activeTab, resetEdit]);
 
   const activeEmpty = showEmpty || tabIsEmpty(parsed, activeTab);
-  const canEdit = hasRun && !activeEmpty && !isLoading;
+  const canEdit = !readOnly && hasRun && !activeEmpty && !isLoading;
 
   const handleEdit = () => {
     switch (activeTab) {
       case "plan":
         setDraft({
           tab: "plan",
-          data: cloneParsed(parsed).projectPlan,
+          data: cloneTabSnapshot(parsed.projectPlan),
         });
         break;
       case "issues":
         setDraft({
           tab: "issues",
-          data: cloneParsed(parsed).issues,
+          data: cloneTabSnapshot(parsed.issues),
         });
         break;
       case "tasks":
         setDraft({
           tab: "tasks",
-          data: cloneParsed(parsed).tasks,
+          data: cloneTabSnapshot(parsed.tasks),
         });
         break;
       case "mom":
         setDraft({
           tab: "mom",
-          data: cloneParsed(parsed).meetingMinutes,
+          data: cloneTabSnapshot(parsed.meetingMinutes),
         });
         break;
     }
@@ -158,16 +167,25 @@ export function DashboardTabs({
         break;
     }
     onParsedChange(next);
-    if (sessionId) persistParsed(sessionId, next);
     resetEdit();
   };
 
   const handleRefineApply = async () => {
     const prompt = refinePrompt.trim();
-    if (!prompt) return;
-    await onRefine(prompt, activeTab);
-    setRefinePrompt("");
-    resetEdit();
+    if (!prompt || !onRefine) return;
+
+    const snapshot =
+      isEditing && draft?.tab === activeTab
+        ? draft.data
+        : getTabSnapshot(parsed, activeTab);
+
+    try {
+      await onRefine(prompt, activeTab, snapshot);
+      setRefinePrompt("");
+      resetEdit();
+    } catch {
+      /* parent surfaces error; keep prompt and draft */
+    }
   };
 
   const exportActions = useMemo(() => {
@@ -260,19 +278,21 @@ export function DashboardTabs({
           onChange={(key) => setActiveTab(key as DashboardTabId)}
         />
         <div className="flex flex-wrap items-center gap-3">
-          <EditToolbar
-            isEditing={isEditing}
-            isDirty={isDirty}
-            canEdit={canEdit}
-            onEdit={handleEdit}
-            onSave={handleSave}
-            onCancel={handleCancel}
-          />
+          {!readOnly ? (
+            <EditToolbar
+              isEditing={isEditing}
+              isDirty={isDirty}
+              canEdit={canEdit}
+              onEdit={handleEdit}
+              onSave={handleSave}
+              onCancel={handleCancel}
+            />
+          ) : null}
           {exportActions}
         </div>
       </div>
 
-      {hasRun && !isLoading ? (
+      {hasRun && !isLoading && !readOnly && onRefine ? (
         <RefinePromptBar
           value={refinePrompt}
           onChange={setRefinePrompt}
@@ -284,7 +304,12 @@ export function DashboardTabs({
 
       <article className="panel-card relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          {isLoading ? <LoadingOverlay /> : null}
+          {isLoading ? (
+            <LoadingOverlay
+              message={loadingMessage}
+              submessage={loadingSubmessage}
+            />
+          ) : null}
 
           {activeTab === "plan" ? (
             <ProjectPlanTable

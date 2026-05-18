@@ -8,8 +8,6 @@ import type {
   TaskRow,
 } from "@/types/tpm";
 
-const STORAGE_PREFIX = "tpm_parsed_";
-
 export function cloneParsed(parsed: ParsedAgentResponse): ParsedAgentResponse {
   return JSON.parse(JSON.stringify(parsed)) as ParsedAgentResponse;
 }
@@ -95,35 +93,9 @@ export function getTabSnapshot(
   }
 }
 
-export function persistParsed(
-  sessionId: string,
-  parsed: ParsedAgentResponse
-): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      `${STORAGE_PREFIX}${sessionId}`,
-      JSON.stringify(parsed)
-    );
-  } catch {
-    /* quota */
-  }
-}
-
-export function loadParsed(sessionId: string): ParsedAgentResponse | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${sessionId}`);
-    if (!raw) return null;
-    return JSON.parse(raw) as ParsedAgentResponse;
-  } catch {
-    return null;
-  }
-}
-
-export function clearPersistedParsed(sessionId: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(`${STORAGE_PREFIX}${sessionId}`);
+/** Deep-clone a single tab slice (avoids cloning full parsed on edit). */
+export function cloneTabSnapshot<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data)) as T;
 }
 
 export const DASHBOARD_TABS: { key: DashboardTabId; label: string }[] = [

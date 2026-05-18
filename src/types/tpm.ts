@@ -82,5 +82,7 @@ export interface AgentApiResponse {
   reply: string;
   session_id: string;
   parsed: ParsedAgentResponse;
+  persisted?: boolean;
+  persist_error?: string;
   error?: string;
 }
