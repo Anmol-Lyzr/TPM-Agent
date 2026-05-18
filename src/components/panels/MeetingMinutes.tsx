@@ -14,7 +14,7 @@ import {
 } from "@/lib/panelExports";
 
 const cellInput =
-  "w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-[var(--z-brand)] focus:outline-none";
+  "w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
 
 type Props = {
   minutes: MoMType;
@@ -48,7 +48,7 @@ export function MeetingMinutes({
           href={minutes.confluenceLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg bg-[var(--z-brand)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--z-brand-2)]"
+          className="mb-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-primary to-[#A65A2C] px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
         >
           <ExternalLink className="h-4 w-4" />
           Open in Confluence
@@ -71,12 +71,12 @@ export function MeetingMinutes({
       ) : (
         <>
           {minutes.title ? (
-            <h3 className="mb-3 text-base font-semibold text-slate-900">
+            <h3 className="mb-3 text-base font-semibold text-foreground">
               {minutes.title}
             </h3>
           ) : null}
           {minutes.summary ? (
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {minutes.summary}
             </p>
           ) : null}
@@ -90,7 +90,7 @@ export function MeetingMinutes({
   }
 
   return (
-    <article className="panel-card relative flex min-h-[280px] flex-col overflow-hidden">
+    <article className="glass-card relative flex min-h-[280px] flex-col overflow-hidden rounded-xl">
       <PanelHeader
         icon={FileText}
         title="Minutes of Meeting"

@@ -2,7 +2,7 @@
 
 import { ListTodo } from "lucide-react";
 import type { TaskRow } from "@/types/tpm";
-import { Badge } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/panelExports";
 
 const cellInput =
-  "w-full min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[var(--z-brand)] focus:outline-none";
+  "w-full min-w-0 rounded border border-border/50 bg-background/60 px-1.5 py-1 text-xs focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
 
 type Props = {
   tasks: TaskRow[];
@@ -60,13 +60,13 @@ export function TaskTracker({
       {tasks.map((task, i) => (
         <li
           key={`${task.taskNumber}-${i}`}
-          className="rounded-lg border border-[var(--z-border)] bg-[var(--z-panel-2)] p-3"
+          className="glass-card rounded-xl border border-border/40 p-3"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 {task.taskNumber > 0 ? (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-teal-100 text-[10px] font-bold text-teal-800">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">
                     {task.taskNumber}
                   </span>
                 ) : null}
@@ -79,12 +79,12 @@ export function TaskTracker({
                     className={cellInput}
                   />
                 ) : (
-                  <p className="text-sm font-medium text-slate-800">
+                  <p className="text-sm font-medium text-foreground">
                     {task.description}
                   </p>
                 )}
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {isEditing ? (
                   <>
                     <label className="flex items-center gap-1">
@@ -172,7 +172,7 @@ export function TaskTracker({
   }
 
   return (
-    <article className="panel-card relative flex min-h-[280px] flex-col overflow-hidden">
+    <article className="glass-card relative flex min-h-[280px] flex-col overflow-hidden rounded-xl">
       <PanelHeader
         icon={ListTodo}
         title="Task Tracker"

@@ -28,10 +28,10 @@ export function Tabs({
           aria-selected={active === t.key}
           onClick={() => onChange(t.key)}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+            "rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors",
             active === t.key
-              ? "border-[var(--z-border)] bg-white text-slate-900 shadow-sm"
-              : "border-transparent bg-transparent text-slate-600 hover:bg-[var(--z-hover)] hover:text-slate-900"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "bg-black/[0.04] text-muted-foreground hover:text-foreground hover:bg-black/[0.07]"
           )}
         >
           {t.label}

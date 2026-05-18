@@ -12,14 +12,14 @@ export function LoadingOverlay({
   submessage?: string;
 }) {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-white/80 px-6 backdrop-blur-sm">
-      <div className="h-1 w-full max-w-xs overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--z-brand)]" />
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-card/80 px-6 backdrop-blur-sm">
+      <div className="h-1 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
       </div>
-      <p className="mt-4 text-center text-sm font-medium text-slate-700">
+      <p className="mt-4 text-center text-sm font-medium text-foreground">
         {message ?? DEFAULT_MESSAGE}
       </p>
-      <p className="mt-1.5 max-w-[240px] text-center text-xs leading-relaxed text-slate-500">
+      <p className="mt-1.5 max-w-[240px] text-center text-xs leading-relaxed text-muted-foreground">
         {submessage ?? DEFAULT_SUBMESSAGE}
       </p>
     </div>

@@ -1,15 +1,15 @@
 import { cn } from "@/lib/cn";
 
 const variants = {
-  default: "bg-slate-100 text-slate-700",
-  success: "bg-emerald-50 text-emerald-700",
-  warning: "bg-amber-50 text-amber-800",
-  danger: "bg-red-50 text-red-700",
-  brand: "bg-blue-50 text-blue-700",
-  created: "bg-emerald-50 text-emerald-700",
-  updated: "bg-blue-50 text-blue-700",
-  commented: "bg-violet-50 text-violet-700",
-  unknown: "bg-slate-100 text-slate-600",
+  default: "bg-muted text-muted-foreground",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  danger: "bg-destructive/10 text-destructive",
+  brand: "bg-primary/10 text-primary",
+  created: "bg-success/10 text-success",
+  updated: "bg-primary/10 text-primary",
+  commented: "bg-secondary/30 text-secondary-foreground",
+  unknown: "bg-muted text-muted-foreground",
 } as const;
 
 export function Badge({

@@ -2,7 +2,7 @@
 
 import { Bug, ExternalLink } from "lucide-react";
 import type { JiraIssueRow } from "@/types/tpm";
-import { Badge } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/panelExports";
 
 const cellInput =
-  "w-full min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[var(--z-brand)] focus:outline-none";
+  "w-full min-w-0 rounded border border-border/50 bg-background/60 px-1.5 py-1 text-xs focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
 
 type Props = {
   issues: JiraIssueRow[];
@@ -56,10 +56,10 @@ export function IssueTracker({
       <MomMarkdown content={sectionMarkdown} />
     </div>
   ) : (
-    <div className="table-scroll h-full overflow-auto p-2">
+    <div className="h-full overflow-auto p-2">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-[var(--z-border)] text-slate-500">
+          <tr className="border-b border-border/50 text-muted-foreground">
             <th className="px-2 py-2 font-medium">Key</th>
             <th className="px-2 py-2 font-medium">Summary</th>
             <th className="px-2 py-2 font-medium">Status</th>
@@ -71,7 +71,7 @@ export function IssueTracker({
         </thead>
         <tbody>
           {issues.map((issue, idx) => (
-            <tr key={`${issue.key}-${idx}`} className="border-b border-slate-100">
+            <tr key={`${issue.key}-${idx}`} className="border-b border-border/30 hover:bg-black/[0.02]">
               <td className="px-2 py-2.5">
                 {isEditing ? (
                   <input
@@ -83,15 +83,15 @@ export function IssueTracker({
                   <span
                     className={
                       issue.key.startsWith("NEW-")
-                        ? "text-slate-400"
-                        : "font-mono font-semibold text-[var(--z-brand)]"
+                        ? "text-muted-foreground/60"
+                        : "font-mono font-semibold text-primary"
                     }
                   >
                     {issue.key.startsWith("NEW-") ? "—" : issue.key}
                   </span>
                 )}
               </td>
-              <td className="max-w-[180px] px-2 py-2.5 text-slate-700">
+              <td className="max-w-[180px] px-2 py-2.5 text-foreground">
                 {isEditing ? (
                   <textarea
                     value={issue.summary}
@@ -114,7 +114,7 @@ export function IssueTracker({
                   <Badge variant="unknown">{issue.status ?? issue.action}</Badge>
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={issue.assignee ?? ""}
@@ -125,7 +125,7 @@ export function IssueTracker({
                   issue.assignee || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={issue.dueDate ?? ""}
@@ -136,7 +136,7 @@ export function IssueTracker({
                   issue.dueDate || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={issue.priority ?? ""}
@@ -153,7 +153,7 @@ export function IssueTracker({
                     href={issue.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-slate-400 hover:text-[var(--z-brand)]"
+                    className="text-muted-foreground/50 hover:text-primary"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
@@ -171,7 +171,7 @@ export function IssueTracker({
   }
 
   return (
-    <article className="panel-card relative flex min-h-[280px] flex-col overflow-hidden">
+    <article className="glass-card relative flex min-h-[280px] flex-col overflow-hidden rounded-xl">
       <PanelHeader
         icon={Bug}
         title="Issue Tracker"

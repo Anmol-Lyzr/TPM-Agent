@@ -1,0 +1,257 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "TPM Agent" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - img [ref=e10]
+            - generic [ref=e17]: TPM Agent
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Dashboard" [ref=e23] [cursor=pointer]:
+              - /url: /
+              - img [ref=e24]
+              - generic [ref=e28]: Dashboard
+          - listitem [ref=e29]:
+            - link "Workspace" [ref=e30] [cursor=pointer]:
+              - /url: /workspace
+              - img [ref=e31]
+              - generic [ref=e34]: Workspace
+          - listitem [ref=e35]:
+            - link "Session Viewer" [ref=e36] [cursor=pointer]:
+              - /url: /session
+              - img [ref=e37]
+              - generic [ref=e39]: Session Viewer
+        - list [ref=e42]:
+          - listitem [ref=e43]:
+            - link "Settings" [ref=e44] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=e45]
+              - generic [ref=e48]: Settings
+      - list [ref=e50]:
+        - listitem [ref=e51]:
+          - button "CN TPM Agent tpm@lyzr.ai" [ref=e52]:
+            - generic [ref=e54]: CN
+            - generic [ref=e55]:
+              - generic [ref=e56]: TPM Agent
+              - generic [ref=e57]: tpm@lyzr.ai
+            - img [ref=e58]
+    - main [ref=e62]:
+      - button "Toggle Sidebar" [ref=e65]:
+        - img
+        - generic [ref=e66]: Toggle Sidebar
+      - generic [ref=e67]:
+        - complementary [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e71]:
+              - generic [ref=e72]:
+                - heading "Saved sessions" [level=1] [ref=e73]
+                - paragraph [ref=e74]: All TPM sessions stored in MongoDB. Select one to view.
+              - button "Refresh list" [ref=e75]:
+                - img [ref=e76]
+            - list [ref=e127]:
+              - listitem [ref=e128]:
+                - button "The team reviewed open issues from in-flight projects Atlas and Signal, kicked off planning for two new initiatives (Phoenix Mobile SDK and Atlas Analytics Dashboard Q3), and formally logged escalations requested by leadership. Several carryover items remain blocked or in progress, and the Signal GA date is slipping. New work for Phoenix Phase 0 begins 26 May, and Analytics Dashboard is approved for discovery only. 18 May 2026, 17:47 Plan 13 Issues 15 Tasks 13 Transcript 6a06c9cbc5ab512e5b0d21e5-dd5d7yzg0h" [ref=e129]:
+                  - paragraph [ref=e131]: The team reviewed open issues from in-flight projects Atlas and Signal, kicked off planning for two new initiatives (Phoenix Mobile SDK and Atlas Analytics Dashboard Q3), and formally logged escalations requested by leadership. Several carryover items remain blocked or in progress, and the Signal GA date is slipping. New work for Phoenix Phase 0 begins 26 May, and Analytics Dashboard is approved for discovery only.
+                  - paragraph [ref=e132]:
+                    - img [ref=e133]
+                    - text: 18 May 2026, 17:47
+                  - paragraph [ref=e135]:
+                    - generic [ref=e136]: Plan 13
+                    - generic [ref=e137]: Issues 15
+                    - generic [ref=e138]: Tasks 13
+                    - generic [ref=e139]: Transcript
+                  - paragraph [ref=e140]: 6a06c9cbc5ab512e5b0d21e5-dd5d7yzg0h
+                - button "Delete session" [ref=e141]:
+                  - img [ref=e142]
+              - listitem [ref=e145]:
+                - button "The team reviewed open items on the Atlas and Signal programs, planned new work for Phoenix Mobile SDK and the Atlas Analytics Dashboard Q3, and formally logged three leadership escalations. Several Atlas carryovers (SSO timeout, batch job migration, API deprecation docs) remain open and are now blocking dependent programs. Signal GA is being pushed to early June pending legal sign-off, and Phoenix phase zero is gated on resolving SCRUM-12. 18 May 2026, 17:21 Plan 12 Issues 14 Tasks 12 Transcript 6a06c9cbc5ab512e5b0d21e5-wafzkwdeo3d" [ref=e146]:
+                  - paragraph [ref=e148]: The team reviewed open items on the Atlas and Signal programs, planned new work for Phoenix Mobile SDK and the Atlas Analytics Dashboard Q3, and formally logged three leadership escalations. Several Atlas carryovers (SSO timeout, batch job migration, API deprecation docs) remain open and are now blocking dependent programs. Signal GA is being pushed to early June pending legal sign-off, and Phoenix phase zero is gated on resolving SCRUM-12.
+                  - paragraph [ref=e149]:
+                    - img [ref=e150]
+                    - text: 18 May 2026, 17:21
+                  - paragraph [ref=e152]:
+                    - generic [ref=e153]: Plan 12
+                    - generic [ref=e154]: Issues 14
+                    - generic [ref=e155]: Tasks 12
+                    - generic [ref=e156]: Transcript
+                  - paragraph [ref=e157]: 6a06c9cbc5ab512e5b0d21e5-wafzkwdeo3d
+                - button "Delete session" [ref=e158]:
+                  - img [ref=e159]
+        - main [ref=e85]:
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - heading "Session viewer" [level=2] [ref=e89]
+                - paragraph [ref=e90]: Read-only view of the selected session
+              - generic [ref=e162]:
+                - button "Delete" [ref=e163]:
+                  - img [ref=e164]
+                  - text: Delete
+                - link "Open in workspace" [ref=e167] [cursor=pointer]:
+                  - /url: /workspace
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - tablist [ref=e93]:
+                  - tab "Project Plan" [selected] [ref=e94]
+                  - tab "Issue Tracker" [ref=e95]
+                  - tab "Task Tracker" [ref=e96]
+                  - tab "Minutes of Meeting" [ref=e97]
+                - generic [ref=e99]:
+                  - button "Excel" [ref=e100]:
+                    - img [ref=e101]
+                    - text: Excel
+                  - button "Document" [ref=e104]:
+                    - img [ref=e105]
+                    - text: Document
+              - article [ref=e108]:
+                - table [ref=e169]:
+                  - rowgroup [ref=e170]:
+                    - row "Task Start End Duration Owner Dep. Comments" [ref=e171]:
+                      - columnheader "Task" [ref=e172]
+                      - columnheader "Start" [ref=e173]
+                      - columnheader "End" [ref=e174]
+                      - columnheader "Duration" [ref=e175]
+                      - columnheader "Owner" [ref=e176]
+                      - columnheader "Dep." [ref=e177]
+                      - columnheader "Comments" [ref=e178]
+                  - rowgroup [ref=e179]:
+                    - row "1 Complete the RPT tracker on Lovable 15 May → 18 May 15 May 18 May 3 days Monisha Anandaraj — Precedes reminder agent build" [ref=e180]:
+                      - cell "1 Complete the RPT tracker on Lovable 15 May → 18 May" [ref=e181]:
+                        - text: 1 Complete the RPT tracker on Lovable
+                        - generic [ref=e185]: 15 May → 18 May
+                      - cell "15 May" [ref=e186]
+                      - cell "18 May" [ref=e187]
+                      - cell "3 days" [ref=e188]
+                      - cell "Monisha Anandaraj" [ref=e189]
+                      - cell "—" [ref=e190]
+                      - cell "Precedes reminder agent build" [ref=e191]
+                    - row "2 Fix SSO timeout on legacy login (SCRUM-12) — → 18 May — 18 May — Rahul Mehta — High priority; blocks analytics architecture; war room if missed" [ref=e192]:
+                      - cell "2 Fix SSO timeout on legacy login (SCRUM-12) — → 18 May" [ref=e193]:
+                        - text: 2 Fix SSO timeout on legacy login (SCRUM-12)
+                        - generic [ref=e197]: — → 18 May
+                      - cell "—" [ref=e198]
+                      - cell "18 May" [ref=e199]
+                      - cell "—" [ref=e200]
+                      - cell "Rahul Mehta" [ref=e201]
+                      - cell "—" [ref=e202]
+                      - cell "High priority; blocks analytics architecture; war room if missed" [ref=e203]
+                    - row "3 Draft system architecture for Atlas Analytics Dashboard 19 May → 23 May 19 May 23 May 4 days Rahul Mehta 2 Cannot size analytics ingestion until auth stable" [ref=e204]:
+                      - cell "3 Draft system architecture for Atlas Analytics Dashboard 19 May → 23 May" [ref=e205]:
+                        - text: 3 Draft system architecture for Atlas Analytics Dashboard
+                        - generic [ref=e209]: 19 May → 23 May
+                      - cell "19 May" [ref=e210]
+                      - cell "23 May" [ref=e211]
+                      - cell "4 days" [ref=e212]
+                      - cell "Rahul Mehta" [ref=e213]
+                      - cell "2" [ref=e214]
+                      - cell "Cannot size analytics ingestion until auth stable" [ref=e215]
+                    - row "4 Complete outstanding bugs on Excel tracker (RPT) — → 19 May — 19 May — Monisha Anandaraj — Status update committed by 19 May" [ref=e216]:
+                      - cell "4 Complete outstanding bugs on Excel tracker (RPT) — → 19 May" [ref=e217]:
+                        - text: 4 Complete outstanding bugs on Excel tracker (RPT)
+                        - generic [ref=e221]: — → 19 May
+                      - cell "—" [ref=e222]
+                      - cell "19 May" [ref=e223]
+                      - cell "—" [ref=e224]
+                      - cell "Monisha Anandaraj" [ref=e225]
+                      - cell "—" [ref=e226]
+                      - cell "Status update committed by 19 May" [ref=e227]
+                    - row "5 Create agent to notify RPT task owners of nearing end dates 19 May → 21 May 19 May 21 May 2 days Monisha Anandaraj 1 2-day build after RPT tracker on Lovable" [ref=e228]:
+                      - cell "5 Create agent to notify RPT task owners of nearing end dates 19 May → 21 May" [ref=e229]:
+                        - text: 5 Create agent to notify RPT task owners of nearing end dates
+                        - generic [ref=e233]: 19 May → 21 May
+                      - cell "19 May" [ref=e234]
+                      - cell "21 May" [ref=e235]
+                      - cell "2 days" [ref=e236]
+                      - cell "Monisha Anandaraj" [ref=e237]
+                      - cell "1" [ref=e238]
+                      - cell "2-day build after RPT tracker on Lovable" [ref=e239]
+                    - row "6 Build Figma prototypes for Analytics Dashboard v1 20 May → 27 May 20 May 27 May 7 days Monisha Anandaraj 3 Depends on architecture draft" [ref=e240]:
+                      - cell "6 Build Figma prototypes for Analytics Dashboard v1 20 May → 27 May" [ref=e241]:
+                        - text: 6 Build Figma prototypes for Analytics Dashboard v1
+                        - generic [ref=e245]: 20 May → 27 May
+                      - cell "20 May" [ref=e246]
+                      - cell "27 May" [ref=e247]
+                      - cell "7 days" [ref=e248]
+                      - cell "Monisha Anandaraj" [ref=e249]
+                      - cell "3" [ref=e250]
+                      - cell "Depends on architecture draft" [ref=e251]
+                    - row "7 Schedule legal review for SCRUM-31 20 May → 20 May 20 May 20 May 1 day Priya Sharma — 30-minute legal review meeting" [ref=e252]:
+                      - cell "7 Schedule legal review for SCRUM-31 20 May → 20 May" [ref=e253]:
+                        - text: 7 Schedule legal review for SCRUM-31
+                        - generic [ref=e257]: 20 May → 20 May
+                      - cell "20 May" [ref=e258]
+                      - cell "20 May" [ref=e259]
+                      - cell "1 day" [ref=e260]
+                      - cell "Priya Sharma" [ref=e261]
+                      - cell "—" [ref=e262]
+                      - cell "30-minute legal review meeting" [ref=e263]
+                    - row "8 Complete the RPT Idea (SCRUM-5) — → 21 May — 21 May — Monisha Anandaraj — Medium priority" [ref=e264]:
+                      - cell "8 Complete the RPT Idea (SCRUM-5) — → 21 May" [ref=e265]:
+                        - text: 8 Complete the RPT Idea (SCRUM-5)
+                        - generic [ref=e269]: — → 21 May
+                      - cell "—" [ref=e270]
+                      - cell "21 May" [ref=e271]
+                      - cell "—" [ref=e272]
+                      - cell "Monisha Anandaraj" [ref=e273]
+                      - cell "—" [ref=e274]
+                      - cell "Medium priority" [ref=e275]
+                    - row "9 Document API deprecation timeline for partners (SCRUM-22) — → 22 May — 22 May — Monisha Anandaraj — New due date after missing 10 May" [ref=e276]:
+                      - cell "9 Document API deprecation timeline for partners (SCRUM-22) — → 22 May" [ref=e277]:
+                        - text: 9 Document API deprecation timeline for partners (SCRUM-22)
+                        - generic [ref=e281]: — → 22 May
+                      - cell "—" [ref=e282]
+                      - cell "22 May" [ref=e283]
+                      - cell "—" [ref=e284]
+                      - cell "Monisha Anandaraj" [ref=e285]
+                      - cell "—" [ref=e286]
+                      - cell "New due date after missing 10 May" [ref=e287]
+                    - row "10 Add priority fields to all active trackers — → 24 May — 24 May — Monisha Anandaraj — Apply across all active trackers" [ref=e288]:
+                      - cell "10 Add priority fields to all active trackers — → 24 May" [ref=e289]:
+                        - text: 10 Add priority fields to all active trackers
+                        - generic [ref=e293]: — → 24 May
+                      - cell "—" [ref=e294]
+                      - cell "24 May" [ref=e295]
+                      - cell "—" [ref=e296]
+                      - cell "Monisha Anandaraj" [ref=e297]
+                      - cell "—" [ref=e298]
+                      - cell "Apply across all active trackers" [ref=e299]
+                    - row "11 UAT sign-off for dispute resolution emails (SCRUM-31) — → 25 May — 25 May — Priya Sharma 7 Blocks Signal GA announcement" [ref=e300]:
+                      - cell "11 UAT sign-off for dispute resolution emails (SCRUM-31) — → 25 May" [ref=e301]:
+                        - text: 11 UAT sign-off for dispute resolution emails (SCRUM-31)
+                        - generic [ref=e305]: — → 25 May
+                      - cell "—" [ref=e306]
+                      - cell "25 May" [ref=e307]
+                      - cell "—" [ref=e308]
+                      - cell "Priya Sharma" [ref=e309]
+                      - cell "7" [ref=e310]
+                      - cell "Blocks Signal GA announcement" [ref=e311]
+                    - row "12 Phoenix SDK — Phase 0 discovery (PHX-1) 26 May → 6 Jun 26 May 6 Jun 12 days Rahul Mehta 2 Discovery and technical spike; no Phoenix bandwidth until SCRUM-12 done" [ref=e312]:
+                      - cell "12 Phoenix SDK — Phase 0 discovery (PHX-1) 26 May → 6 Jun" [ref=e313]:
+                        - text: 12 Phoenix SDK — Phase 0 discovery (PHX-1)
+                        - generic [ref=e317]: 26 May → 6 Jun
+                      - cell "26 May" [ref=e318]
+                      - cell "6 Jun" [ref=e319]
+                      - cell "12 days" [ref=e320]
+                      - cell "Rahul Mehta" [ref=e321]
+                      - cell "2" [ref=e322]
+                      - cell "Discovery and technical spike; no Phoenix bandwidth until SCRUM-12 done" [ref=e323]
+                    - row "13 Set up CI pipeline for Phoenix sample app 28 May → 30 May 28 May 30 May 2 days Rahul Mehta 12 Depends on PHX-1 discovery outputs" [ref=e324]:
+                      - cell "13 Set up CI pipeline for Phoenix sample app 28 May → 30 May" [ref=e325]:
+                        - text: 13 Set up CI pipeline for Phoenix sample app
+                        - generic [ref=e329]: 28 May → 30 May
+                      - cell "28 May" [ref=e330]
+                      - cell "30 May" [ref=e331]
+                      - cell "2 days" [ref=e332]
+                      - cell "Rahul Mehta" [ref=e333]
+                      - cell "12" [ref=e334]
+                      - cell "Depends on PHX-1 discovery outputs" [ref=e335]
+            - group [ref=e336]:
+              - generic "View stored transcript" [ref=e337] [cursor=pointer]
+            - group [ref=e338]:
+              - generic "View raw agent response" [ref=e339] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e122] [cursor=pointer]:
+    - img [ref=e123]
+  - alert [ref=e126]

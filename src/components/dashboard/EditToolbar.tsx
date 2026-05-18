@@ -32,10 +32,10 @@ export function EditToolbar({
         className={cn(
           "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
           isDirty
-            ? "bg-amber-50 text-amber-800"
+            ? "bg-warning/10 text-warning"
             : isEditing
-              ? "bg-blue-50 text-blue-700"
-              : "bg-slate-100 text-slate-600"
+              ? "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground"
         )}
       >
         {statusLabel}
@@ -45,7 +45,7 @@ export function EditToolbar({
           type="button"
           disabled={!canEdit}
           onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--z-border)] bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-40"
         >
           <Pencil className="h-3.5 w-3.5" />
           Edit
@@ -56,7 +56,7 @@ export function EditToolbar({
             type="button"
             disabled={!isDirty}
             onClick={onSave}
-            className="inline-flex items-center gap-1 rounded-md bg-[var(--z-brand)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--z-brand-2)] disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
           >
             <Save className="h-3.5 w-3.5" />
             Save
@@ -64,7 +64,7 @@ export function EditToolbar({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--z-border)] bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted/50"
           >
             <X className="h-3.5 w-3.5" />
             Cancel

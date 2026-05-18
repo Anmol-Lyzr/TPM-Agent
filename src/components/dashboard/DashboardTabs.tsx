@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Tabs } from "@/components/ui/Tabs";
+import { Tabs } from "@/components/ui/tabs";
 import { EditToolbar } from "@/components/dashboard/EditToolbar";
 import { RefinePromptBar } from "@/components/dashboard/RefinePromptBar";
 import { PanelExportActions } from "@/components/ui/PanelExportActions";
@@ -302,7 +302,7 @@ export function DashboardTabs({
         />
       ) : null}
 
-      <article className="panel-card relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <article className="glass-card relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
         <div className="relative min-h-0 flex-1 overflow-hidden">
           {isLoading ? (
             <LoadingOverlay

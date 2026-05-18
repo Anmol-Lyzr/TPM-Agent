@@ -2,46 +2,42 @@
 
 import { type ComponentType } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Bug,
-  Calendar,
-  FileText,
-  ListTodo,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Bug, Calendar, FileText, ListTodo, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { useStoredSession } from "@/hooks/useStoredSession";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+};
 
 function StatCard({
   label,
   value,
   hint,
   icon: Icon,
-  accent,
 }: {
   label: string;
   value: string | number;
   hint: string;
   icon: ComponentType<{ className?: string }>;
-  accent: string;
 }) {
   return (
-    <article className="panel-card flex flex-col gap-3 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${accent}`}
-        >
-          <Icon className="h-5 w-5" />
+    <motion.div variants={itemVariants} className="glass-card rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="p-1.5 rounded-lg bg-primary/10">
+          <Icon className="w-3.5 h-3.5 text-primary" />
         </div>
-        <p className="text-2xl font-semibold tabular-nums text-slate-900">
-          {value}
-        </p>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
-      <div>
-        <p className="text-sm font-medium text-slate-800">{label}</p>
-        <p className="mt-0.5 text-xs text-slate-500">{hint}</p>
-      </div>
-    </article>
+      <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
+      <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>
+    </motion.div>
   );
 }
 
@@ -60,41 +56,42 @@ export function DashboardHome() {
   ).length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto">
-      <header className="shrink-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--z-brand)]">
-          TPM Agent
+    <div className="p-4 md:p-8 max-w-4xl mx-auto w-full">
+      {/* Page header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-1">
+          <Sparkles className="w-6 h-6 text-primary" />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Meeting intelligence — plans, issues, tasks, and minutes from MS Teams transcripts.
         </p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">
-          Dashboard
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Overview of your meeting intelligence — plans, Jira issues, tasks, and
-          minutes from MS Teams transcripts.
-        </p>
-      </header>
+      </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Stat cards */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+      >
         <StatCard
           label="Project plan"
           value={ready ? parsed.projectPlan.length : "—"}
-          hint="Smartsheet schedule rows"
+          hint="Smartsheet rows"
           icon={Calendar}
-          accent="bg-teal-50 text-teal-700"
         />
         <StatCard
           label="Jira issues"
           value={ready ? parsed.issues.length : "—"}
-          hint="Tracked in issue list"
+          hint="Tracked issues"
           icon={Bug}
-          accent="bg-blue-50 text-blue-700"
         />
         <StatCard
           label="Tasks"
           value={ready ? parsed.tasks.length : "—"}
           hint={`${scheduledTasks} scheduled`}
           icon={ListTodo}
-          accent="bg-violet-50 text-violet-700"
         />
         <StatCard
           label="Meeting minutes"
@@ -109,87 +106,93 @@ export function DashboardHome() {
           }
           hint="Confluence summary"
           icon={FileText}
-          accent="bg-amber-50 text-amber-700"
         />
-      </section>
+      </motion.div>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <article className="panel-card lg:col-span-2 p-6">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Session status
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            {hasSession ? (
-              <>
-                Active workspace session
-                {hasData
-                  ? " with analyzed meeting output."
-                  : " — open the workspace to analyze a transcript."}
-              </>
-            ) : (
-              "No active session. Start in the workspace with a meeting transcript."
-            )}
-          </p>
-          {hasSession && sessionId ? (
-            <p className="mt-3 truncate rounded-md bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-500">
-              {sessionId}
+      {/* Session status + Quick start */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid gap-4 lg:grid-cols-3"
+      >
+        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden lg:col-span-2">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Session status</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-sm text-muted-foreground mb-4">
+              {hasSession ? (
+                <>
+                  Active workspace session
+                  {hasData
+                    ? " with analyzed meeting output."
+                    : " — open the workspace to analyze a transcript."}
+                </>
+              ) : (
+                "No active session. Start in the workspace with a meeting transcript."
+              )}
             </p>
-          ) : null}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href="/workspace"
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--z-brand)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--z-brand-2)]"
-            >
-              <Sparkles className="h-4 w-4" />
-              Open workspace
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            {hasData ? (
+            {hasSession && sessionId ? (
+              <p className="mb-4 truncate rounded-lg bg-black/[0.04] px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                {sessionId}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
               <Link
                 href="/workspace"
-                className="inline-flex items-center gap-2 rounded-lg border border-[var(--z-border)] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-primary to-[#A65A2C] text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all shadow-sm"
               >
-                Continue editing
+                <Sparkles className="h-4 w-4" />
+                Open workspace
+                <ArrowRight className="h-4 w-4" />
               </Link>
-            ) : null}
-            <Link
-              href={
-                sessionId
-                  ? `/session?id=${encodeURIComponent(sessionId)}`
-                  : "/session"
-              }
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--z-border)] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Browse saved sessions
-            </Link>
+              {hasData ? (
+                <Link
+                  href="/workspace"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
+                >
+                  Continue editing
+                </Link>
+              ) : null}
+              <Link
+                href={
+                  sessionId
+                    ? `/session?id=${encodeURIComponent(sessionId)}`
+                    : "/session"
+                }
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
+              >
+                Browse sessions
+              </Link>
+            </div>
           </div>
-        </article>
+        </motion.div>
 
-        <article className="panel-card p-6">
-          <h2 className="text-sm font-semibold text-slate-900">Quick start</h2>
-          <ol className="mt-3 space-y-3 text-sm text-slate-600">
-            <li className="flex gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
-                1
-              </span>
-              Open the workspace and paste a transcript
-            </li>
-            <li className="flex gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
-                2
-              </span>
-              Run Analyze Meeting to generate outputs
-            </li>
-            <li className="flex gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
-                3
-              </span>
-              Edit, export, or refine with AI per tab
-            </li>
-          </ol>
-        </article>
-      </section>
-
+        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
+            <ListTodo className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Quick start</h2>
+          </div>
+          <div className="p-5">
+            <ol className="space-y-3">
+              {[
+                "Open the workspace and paste a transcript",
+                "Run Analyze Meeting to generate outputs",
+                "Edit, export, or refine with AI per tab",
+              ].map((step, i) => (
+                <li key={i} className="flex gap-2.5 items-start">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

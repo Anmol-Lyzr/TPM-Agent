@@ -18,7 +18,7 @@ function formatWhen(iso?: string): string {
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
-    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
       {label} {value}
     </span>
   );
@@ -47,11 +47,11 @@ export function SessionListPanel({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-[var(--z-border)] px-4 py-4">
+      <div className="border-b border-border/50 px-4 py-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Saved sessions</h1>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h1 className="text-lg font-semibold text-foreground">Saved sessions</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               All TPM sessions stored in MongoDB. Select one to view.
             </p>
           </div>
@@ -60,7 +60,7 @@ export function SessionListPanel({
             onClick={onRefresh}
             disabled={listLoading}
             title="Refresh list"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--z-border)] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-card text-muted-foreground hover:bg-muted/50 disabled:opacity-50"
           >
             <RefreshCw
               className={cn("h-4 w-4", listLoading && "animate-spin")}
@@ -71,21 +71,21 @@ export function SessionListPanel({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
         {listError ? (
-          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {listError}
           </p>
         ) : null}
 
         {listLoading && sessions.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-slate-500">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--z-brand)]" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
             Loading sessions…
           </div>
         ) : null}
 
         {!listLoading && sessions.length === 0 && !listError ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 text-center text-sm text-slate-500">
-            <FileText className="h-8 w-8 text-slate-300" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 text-center text-sm text-muted-foreground">
+            <FileText className="h-8 w-8 text-muted-foreground/30" />
             <p>No saved sessions yet.</p>
             <p className="text-xs">
               Analyze a transcript in the workspace to create one.
@@ -104,10 +104,10 @@ export function SessionListPanel({
                 <li
                   key={session.sessionId}
                   className={cn(
-                    "flex overflow-hidden rounded-lg border transition-colors",
+                    "flex overflow-hidden rounded-xl border transition-colors",
                     selected
-                      ? "border-[var(--z-brand)] bg-teal-50/80 ring-1 ring-[var(--z-brand)]/30"
-                      : "border-[var(--z-border)] bg-white",
+                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/50 bg-card/60",
                     detailLoading && !selected && "opacity-50",
                     deleting && "opacity-60"
                   )}
@@ -116,17 +116,17 @@ export function SessionListPanel({
                     type="button"
                     onClick={() => onSelect(session.sessionId)}
                     disabled={(detailLoading && !selected) || deleting}
-                    className="min-w-0 flex-1 px-3 py-3 text-left hover:bg-slate-50/80 disabled:cursor-not-allowed"
+                    className="min-w-0 flex-1 px-3 py-3 text-left hover:bg-black/[0.03] disabled:cursor-not-allowed"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-medium text-slate-900">
+                      <p className="line-clamp-2 text-sm font-medium text-foreground">
                         {session.title}
                       </p>
                       {loadingThis ? (
-                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--z-brand)]" />
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                       ) : null}
                     </div>
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Calendar className="h-3 w-3 shrink-0" />
                       {formatWhen(session.updatedAt)}
                     </p>
@@ -135,12 +135,12 @@ export function SessionListPanel({
                       <StatPill label="Issues" value={session.issuesCount} />
                       <StatPill label="Tasks" value={session.tasksCount} />
                       {session.hasTranscript ? (
-                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
                           Transcript
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-2 truncate font-mono text-[10px] text-slate-400">
+                    <p className="mt-2 truncate font-mono text-[10px] text-muted-foreground/60">
                       {session.sessionId}
                     </p>
                   </button>
@@ -149,7 +149,7 @@ export function SessionListPanel({
                     title="Delete session"
                     disabled={Boolean(deletingSessionId)}
                     onClick={() => onDelete(session.sessionId, session.title)}
-                    className="flex w-10 shrink-0 items-center justify-center border-l border-[var(--z-border)] text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-10 shrink-0 items-center justify-center border-l border-border/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {deleting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

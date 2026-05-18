@@ -14,19 +14,19 @@ import {
 } from "@/lib/panelExports";
 
 const cellInput =
-  "w-full min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[var(--z-brand)] focus:outline-none";
+  "w-full min-w-0 rounded border border-border/50 bg-background/60 px-1.5 py-1 text-xs focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
 
 function TimelineBar({ start, end }: { start: string; end: string }) {
   if (!start && !end) return null;
   return (
     <div className="mt-1 flex items-center gap-1">
-      <div className="h-1.5 flex-1 max-w-[80px] rounded-full bg-slate-200">
+      <div className="h-1.5 flex-1 max-w-[80px] rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-teal-500"
+          className="h-full rounded-full bg-primary/60"
           style={{ width: start && end ? "100%" : "40%" }}
         />
       </div>
-      <span className="text-[10px] text-slate-400">
+      <span className="text-[10px] text-muted-foreground">
         {start || "—"} → {end || "—"}
       </span>
     </div>
@@ -73,10 +73,10 @@ export function ProjectPlanTable({
       <MomMarkdown content={sectionMarkdown} />
     </div>
   ) : (
-    <div className="table-scroll h-full overflow-auto p-2">
+    <div className="h-full overflow-auto p-2">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-[var(--z-border)] text-slate-500">
+          <tr className="border-b border-border/50 text-muted-foreground">
             <th className="px-2 py-2 font-medium">Task</th>
             <th className="px-2 py-2 font-medium">Start</th>
             <th className="px-2 py-2 font-medium">End</th>
@@ -88,7 +88,7 @@ export function ProjectPlanTable({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-b border-slate-100">
+            <tr key={i} className="border-b border-border/30 hover:bg-black/[0.02]">
               <td className="px-2 py-2.5">
                 {isEditing ? (
                   <textarea
@@ -101,14 +101,14 @@ export function ProjectPlanTable({
                   />
                 ) : (
                   <>
-                    <span className="font-medium text-slate-800">
+                    <span className="font-medium text-foreground">
                       {row.taskDesc}
                     </span>
                     <TimelineBar start={row.start} end={row.end} />
                   </>
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={row.start}
@@ -119,7 +119,7 @@ export function ProjectPlanTable({
                   row.start || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={row.end}
@@ -130,7 +130,7 @@ export function ProjectPlanTable({
                   row.end || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={row.duration}
@@ -143,7 +143,7 @@ export function ProjectPlanTable({
                   row.duration || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={row.owner}
@@ -154,7 +154,7 @@ export function ProjectPlanTable({
                   row.owner || "—"
                 )}
               </td>
-              <td className="px-2 py-2.5 text-slate-600">
+              <td className="px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <input
                     value={row.dependency}
@@ -167,7 +167,7 @@ export function ProjectPlanTable({
                   row.dependency || "—"
                 )}
               </td>
-              <td className="max-w-[140px] px-2 py-2.5 text-slate-500">
+              <td className="max-w-[140px] px-2 py-2.5 text-muted-foreground">
                 {isEditing ? (
                   <textarea
                     value={row.comments}
@@ -193,7 +193,7 @@ export function ProjectPlanTable({
   }
 
   return (
-    <article className="panel-card relative flex min-h-[280px] flex-col overflow-hidden">
+    <article className="glass-card relative flex min-h-[280px] flex-col overflow-hidden rounded-xl">
       <PanelHeader
         icon={Calendar}
         title="Project Plan"

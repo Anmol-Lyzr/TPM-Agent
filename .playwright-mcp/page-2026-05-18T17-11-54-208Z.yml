@@ -1,0 +1,103 @@
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - link "TPM Agent" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img [ref=e10]
+          - generic [ref=e17]: TPM Agent
+    - generic [ref=e18]:
+      - list [ref=e21]:
+        - listitem [ref=e22]:
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /
+            - img [ref=e24]
+            - generic [ref=e28]: Dashboard
+        - listitem [ref=e29]:
+          - link "Workspace" [ref=e30] [cursor=pointer]:
+            - /url: /workspace
+            - img [ref=e31]
+            - generic [ref=e34]: Workspace
+        - listitem [ref=e35]:
+          - link "Session Viewer" [ref=e36] [cursor=pointer]:
+            - /url: /session
+            - img [ref=e37]
+            - generic [ref=e39]: Session Viewer
+      - list [ref=e42]:
+        - listitem [ref=e43]:
+          - link "Settings" [ref=e44] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e45]
+            - generic [ref=e48]: Settings
+    - list [ref=e50]:
+      - listitem [ref=e51]:
+        - button "CN TPM Agent tpm@lyzr.ai" [ref=e52]:
+          - generic [ref=e54]: CN
+          - generic [ref=e55]:
+            - generic [ref=e56]: TPM Agent
+            - generic [ref=e57]: tpm@lyzr.ai
+          - img [ref=e58]
+  - main [ref=e62]:
+    - button "Toggle Sidebar" [ref=e65]:
+      - img
+      - generic [ref=e66]: Toggle Sidebar
+    - generic [ref=e68]:
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - img [ref=e71]
+          - heading "Dashboard" [level=1] [ref=e73]
+        - paragraph [ref=e74]: Meeting intelligence — plans, issues, tasks, and minutes from MS Teams transcripts.
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - img [ref=e79]
+            - generic [ref=e81]: Project plan
+          - paragraph [ref=e82]: —
+          - paragraph [ref=e83]: Smartsheet rows
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - img [ref=e87]
+            - generic [ref=e96]: Jira issues
+          - paragraph [ref=e97]: —
+          - paragraph [ref=e98]: Tracked issues
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - img [ref=e102]
+            - generic [ref=e105]: Tasks
+          - paragraph [ref=e106]: —
+          - paragraph [ref=e107]: 0 scheduled
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - img [ref=e111]
+            - generic [ref=e114]: Meeting minutes
+          - paragraph [ref=e115]: —
+          - paragraph [ref=e116]: Confluence summary
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - img [ref=e120]
+            - heading "Session status" [level=2] [ref=e122]
+          - generic [ref=e123]:
+            - paragraph [ref=e124]: No active session. Start in the workspace with a meeting transcript.
+            - generic [ref=e125]:
+              - link "Open workspace" [ref=e126] [cursor=pointer]:
+                - /url: /workspace
+                - img [ref=e127]
+                - text: Open workspace
+                - img [ref=e129]
+              - link "Browse sessions" [ref=e131] [cursor=pointer]:
+                - /url: /session
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - img [ref=e134]
+            - heading "Quick start" [level=2] [ref=e137]
+          - list [ref=e139]:
+            - listitem [ref=e140]:
+              - generic [ref=e141]: "1"
+              - generic [ref=e142]: Open the workspace and paste a transcript
+            - listitem [ref=e143]:
+              - generic [ref=e144]: "2"
+              - generic [ref=e145]: Run Analyze Meeting to generate outputs
+            - listitem [ref=e146]:
+              - generic [ref=e147]: "3"
+              - generic [ref=e148]: Edit, export, or refine with AI per tab

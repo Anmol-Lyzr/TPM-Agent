@@ -1,9 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { AppShell } from "@/components/layout/AppShell";
 import { TranscriptPanel } from "@/components/input/TranscriptPanel";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import { SAMPLE_TRANSCRIPT } from "@/lib/sampleTranscript";
@@ -185,8 +182,9 @@ export default function WorkspacePage() {
   const showEmpty = !hasRun && !isLoading;
 
   return (
-    <AppShell
-      leftPanel={
+    <div className="flex flex-1 overflow-hidden app-bg">
+      {/* Left panel */}
+      <aside className="w-[380px] flex-shrink-0 border-r border-border/50 flex flex-col bg-card/30 overflow-hidden">
         <TranscriptPanel
           transcript={transcript}
           onTranscriptChange={setTranscript}
@@ -197,45 +195,42 @@ export default function WorkspacePage() {
           onNewMeeting={handleNewMeeting}
           onLoadSample={handleLoadSample}
         />
-      }
-    >
-      <header className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link
-            href="/"
-            className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[var(--z-brand)]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Dashboard
-          </Link>
-          <h2 className="text-xl font-semibold text-slate-900">Workspace</h2>
-          <p className="text-sm text-slate-500">
-            Analyze transcripts and manage project plan, issues, tasks, and
-            minutes
-          </p>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto flex flex-col">
+        <div className="p-4 md:p-6 flex flex-col flex-1">
+          <header className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">Workspace</h2>
+              <p className="text-sm text-muted-foreground">
+                Analyze transcripts and manage project plan, issues, tasks, and minutes
+              </p>
+            </div>
+          </header>
+
+          <DashboardTabs
+            parsed={parsed}
+            onParsedChange={handleParsedChange}
+            sessionId={sessionId}
+            isLoading={isLoading}
+            hasRun={hasRun}
+            showEmpty={showEmpty}
+            onRefine={handleRefine}
+          />
+
+          {rawReply && hasRun ? (
+            <details className="mt-4 shrink-0 rounded-xl glass-card">
+              <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-muted-foreground">
+                View raw agent response
+              </summary>
+              <pre className="max-h-48 overflow-auto border-t border-black/[0.05] p-4 text-xs whitespace-pre-wrap text-muted-foreground">
+                {rawReply}
+              </pre>
+            </details>
+          ) : null}
         </div>
-      </header>
-
-      <DashboardTabs
-        parsed={parsed}
-        onParsedChange={handleParsedChange}
-        sessionId={sessionId}
-        isLoading={isLoading}
-        hasRun={hasRun}
-        showEmpty={showEmpty}
-        onRefine={handleRefine}
-      />
-
-      {rawReply && hasRun ? (
-        <details className="mt-4 shrink-0 rounded-lg border border-[var(--z-border)] bg-white">
-          <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-slate-500">
-            View raw agent response
-          </summary>
-          <pre className="max-h-48 overflow-auto border-t border-[var(--z-border)] p-4 text-xs whitespace-pre-wrap text-slate-600">
-            {rawReply}
-          </pre>
-        </details>
-      ) : null}
-    </AppShell>
+      </main>
+    </div>
   );
 }

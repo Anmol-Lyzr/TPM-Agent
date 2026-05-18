@@ -22,8 +22,8 @@ export function PanelExportActions({
         onClick={onExportExcel}
         title="Export to Excel"
         className={cn(
-          "inline-flex items-center gap-1 rounded-md border border-[var(--z-border)] bg-white px-2 py-1 text-[10px] font-medium text-slate-600",
-          "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
+          "inline-flex items-center gap-1 rounded-md border border-border/50 bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground",
+          "hover:border-success/30 hover:bg-success/10 hover:text-success",
           "disabled:cursor-not-allowed disabled:opacity-40"
         )}
       >
@@ -36,8 +36,8 @@ export function PanelExportActions({
         onClick={onExportDocument}
         title="Export as Word document"
         className={cn(
-          "inline-flex items-center gap-1 rounded-md border border-[var(--z-border)] bg-white px-2 py-1 text-[10px] font-medium text-slate-600",
-          "hover:border-blue-200 hover:bg-blue-50 hover:text-[var(--z-brand)]",
+          "inline-flex items-center gap-1 rounded-md border border-border/50 bg-card px-2 py-1 text-[10px] font-medium text-muted-foreground",
+          "hover:border-primary/30 hover:bg-primary/10 hover:text-primary",
           "disabled:cursor-not-allowed disabled:opacity-40"
         )}
       >

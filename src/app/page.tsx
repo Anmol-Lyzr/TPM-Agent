@@ -1,10 +1,9 @@
-import { AppShell } from "@/components/layout/AppShell";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 
 export default function DashboardPage() {
   return (
-    <AppShell>
+    <div className="flex flex-1 flex-col overflow-auto app-bg">
       <DashboardHome />
-    </AppShell>
+    </div>
   );
 }
