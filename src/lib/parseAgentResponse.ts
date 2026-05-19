@@ -2,7 +2,11 @@ import {
   extractJiraIssuesFromTranscript,
   mergeJiraIssues,
 } from "@/lib/jiraFromTranscript";
-import { enrichProjectPlan, enrichProjectPlanRow } from "@/lib/projectPlan";
+import {
+  enrichProjectPlan,
+  enrichProjectPlanRow,
+  filterBugsFromProjectPlan,
+} from "@/lib/projectPlan";
 import {
   buildRaidLog,
   extractBulletsUnderHeader,
@@ -499,7 +503,10 @@ export function parseAgentMarkdown(
     ? extractJiraIssuesFromTranscript(options.transcript)
     : [];
   const issues = mergeJiraIssues(fromAgent, fromTranscriptIssues);
-  const projectPlan = enrichProjectPlan(parseSmartsheetTable(sections.smartsheet));
+  const projectPlan = filterBugsFromProjectPlan(
+    enrichProjectPlan(parseSmartsheetTable(sections.smartsheet)),
+    issues
+  );
   const meetingMinutes = parseMeetingMinutes(sections.confluence, markdown);
 
   if (!meetingMinutes.title && confluenceTitle) {

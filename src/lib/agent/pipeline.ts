@@ -1,5 +1,6 @@
 import { formatAgentTextReply } from "@/lib/formatAgentText";
 import { parseAgentMarkdown } from "@/lib/parseAgentResponse";
+import { filterBugsFromProjectPlan } from "@/lib/projectPlan";
 import { buildRaidLog, enrichParsedRaid, formatRaidLogMarkdown } from "@/lib/raidLog";
 import type { ParsedAgentResponse } from "@/types/tpm";
 
@@ -59,10 +60,11 @@ export function parseAgentOutput(
       ? fromMarkdown.issues
       : (structured?.issues ?? []);
 
-  const projectPlan =
+  const rawPlan =
     fromMarkdown.projectPlan.length > 0
       ? fromMarkdown.projectPlan
       : (structured?.projectPlan ?? []);
+  const projectPlan = filterBugsFromProjectPlan(rawPlan, issues);
 
   let raidLog = fromMarkdown.raidLog;
   if (raidLog.length === 0 && structured?.raidLog?.length) {

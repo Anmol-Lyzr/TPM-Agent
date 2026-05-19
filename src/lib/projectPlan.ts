@@ -1,4 +1,5 @@
-import type { ProjectPlanRow } from "@/types/tpm";
+import type { JiraIssueRow, ProjectPlanRow } from "@/types/tpm";
+import { isBugIssue } from "@/lib/analytics";
 
 /** Smartsheet WBS column headers (CCB onboarding template). */
 export const PROJECT_PLAN_COLUMNS = [
@@ -322,4 +323,70 @@ export function enrichProjectPlan(rows: ProjectPlanRow[]): ProjectPlanRow[] {
   const normalized = rows.map((r) => enrichProjectPlanRow(r));
   const withMilestones = inferMilestonesFromStructure(normalized);
   return assignMilestoneWbsIds(withMilestones);
+}
+
+const JIRA_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
+const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
+const WBS_ID_RE = /^(?:\d+(?:\.\d+)*|M\d+|0)$/i;
+
+/** True when a WBS id cell holds a Jira key (e.g. HMC-401), not a schedule id (1.1 / M1). */
+export function wbsIdLooksLikeIssueKey(wbsId: string): boolean {
+  const id = wbsId.trim();
+  if (!id || WBS_ID_RE.test(id)) return false;
+  return ISSUE_KEY_RE.test(id);
+}
+
+function collectJiraKeys(text: string): string[] {
+  return [...text.matchAll(JIRA_KEY)].map((m) => m[1]);
+}
+
+/**
+ * Detect Smartsheet rows that are Jira bugs/defects (belong in Issue Tracker only).
+ */
+export function isBugProjectPlanRow(
+  row: ProjectPlanRow,
+  knownBugKeys?: ReadonlySet<string>
+): boolean {
+  const name = getPlanTaskName(row);
+  const desc = getPlanTaskDescription(row);
+  const combined = [name, desc, row.taskDesc, row.comments].filter(Boolean).join(" ");
+
+  if (/^bug\s+[A-Z][A-Z0-9]+-\d+/i.test(name)) return true;
+  if (/^regression\s+bug\b/i.test(name)) return true;
+  if (/\bdefect\s+review\b/i.test(name) && !/\btask\b/i.test(name)) return false;
+
+  const wbsId = getPlanWbsId(row);
+  if (wbsId && wbsIdLooksLikeIssueKey(wbsId)) {
+    if (knownBugKeys?.has(wbsId)) return true;
+    if (/\b(bug|defect|regression)\b/i.test(combined)) return true;
+    return true;
+  }
+
+  const keys = collectJiraKeys(combined);
+  for (const key of keys) {
+    if (knownBugKeys?.has(key)) return true;
+    if (new RegExp(`\\bBug\\s+${key}\\b`, "i").test(combined)) return true;
+    if (
+      /\b(bug|defect|regression)\b/i.test(name) &&
+      !/\b(complete|outstanding|tracker|excel|burn-down|triage)\b/i.test(name)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Remove Jira bug/defect rows from the schedule; keep delivery tasks only. */
+export function filterBugsFromProjectPlan(
+  rows: ProjectPlanRow[],
+  issues?: JiraIssueRow[]
+): ProjectPlanRow[] {
+  const bugKeys = new Set<string>();
+  for (const issue of issues ?? []) {
+    if (isBugIssue(issue) || /bug|defect/i.test(issue.summary)) {
+      bugKeys.add(issue.key);
+    }
+  }
+  return rows.filter((row) => !isBugProjectPlanRow(row, bugKeys));
 }

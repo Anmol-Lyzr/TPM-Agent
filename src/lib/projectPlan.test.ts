@@ -1,6 +1,8 @@
 import {
   enrichProjectPlan,
   enrichProjectPlanRow,
+  filterBugsFromProjectPlan,
+  isBugProjectPlanRow,
   isProjectPlanMilestone,
   parseMilestoneDescriptor,
 } from "./projectPlan";
@@ -116,5 +118,49 @@ assert(
   wbsRow.taskName?.includes("Receive requirements"),
   "preserves task name"
 );
+
+const bugRow = {
+  wbsId: "HMC-401",
+  taskName: "Move-in checklist shows wrong installation timezone for Hawaii-bound families",
+  taskDesc: "",
+  start: "",
+  end: "",
+  duration: "",
+  owner: "Elena Vasquez",
+  dependency: "",
+  comments: "",
+  status: "Open",
+  priority: "High",
+};
+assert(isBugProjectPlanRow(bugRow), "HMC bug row detected");
+const deliveryRow = {
+  wbsId: "1.1",
+  taskName: "Finalize Resident Connect product requirements v1.0",
+  taskDesc: "",
+  start: "20 May 2026",
+  end: "23 May 2026",
+  duration: "3",
+  owner: "James Rivera",
+  dependency: "",
+  comments: "",
+};
+assert(!isBugProjectPlanRow(deliveryRow), "WBS delivery task kept");
+const trackerMeta = {
+  taskDesc: "Complete outstanding bugs on the excel tracker",
+  start: "",
+  end: "",
+  duration: "",
+  owner: "Monisha",
+  dependency: "",
+  comments: "",
+};
+assert(!isBugProjectPlanRow(trackerMeta), "bug-tracker meta task is not a defect row");
+
+const filtered = filterBugsFromProjectPlan(
+  [bugRow, deliveryRow],
+  [{ key: "HMC-401", summary: bugRow.taskName, action: "unknown", issueType: "Bug" }]
+);
+assert(filtered.length === 1, "filters bug from plan");
+assert(filtered[0]?.wbsId === "1.1", "keeps delivery task");
 
 console.log("projectPlan.test.ts: all assertions passed");

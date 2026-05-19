@@ -28,7 +28,7 @@ User instruction:
 Return the FULL standard TPM output with all four sections:
 1. Confluence — Meeting summary
 2. JIRA — Task list (Excel import)
-3. Smartsheet — Project plan WBS table with columns: WBS ID | Task Name | Task Description | Owner / Resource | Start Date | End Date | Duration (Days) | Dependency (WBS ID) | Status | Priority | Comments / Notes. Use milestone rows with WBS IDs M1, M2, … and Task Name "MILESTONE: …"; indent sub-tasks in Task Name (e.g. "    Requirements Gathering"); include WBS IDs like 1.1, 1.1.1 for work items.
+3. Smartsheet — Project plan WBS table with columns: WBS ID | Task Name | Task Description | Owner / Resource | Start Date | End Date | Duration (Days) | Dependency (WBS ID) | Status | Priority | Comments / Notes. Use milestone rows with WBS IDs M1, M2, … and Task Name "MILESTONE: …"; indent sub-tasks in Task Name (e.g. "    Requirements Gathering"); include WBS IDs like 1.1, 1.1.1 for work items. Do NOT put Jira bugs or defect rows (e.g. HMC-401, SCRUM-201) in the project plan—list those only in section 2 (JIRA).
 4. RAID — RAID log table (Type: Risk | Assumption | Issue | Dependency; columns for Description, Owner, Impact, Probability, Status, Mitigation, Target date)
 
 Keep unchanged content identical unless the user instruction requires a change.
