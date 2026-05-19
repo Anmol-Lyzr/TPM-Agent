@@ -21,7 +21,89 @@ export function stripPlanMarkdown(value: string): string {
   return value.replace(/\*\*/g, "").trim();
 }
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+};
+
+function parsePlanDate(value: string): Date | null {
+  const text = stripPlanMarkdown(value);
+  if (!text) return null;
+
+  const dmy = text.match(/^(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?$/);
+  if (dmy) {
+    const month = MONTH_INDEX[dmy[2].slice(0, 3).toLowerCase()];
+    if (month === undefined) return null;
+    const year = dmy[3] ? parseInt(dmy[3], 10) : new Date().getFullYear();
+    return new Date(year, month, parseInt(dmy[1], 10));
+  }
+
+  const mdy = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (mdy) {
+    const month = MONTH_INDEX[mdy[1].slice(0, 3).toLowerCase()];
+    if (month === undefined) return null;
+    return new Date(parseInt(mdy[3], 10), month, parseInt(mdy[2], 10));
+  }
+
+  return null;
+}
+
+function computeDurationDays(start: string, end: string): number | null {
+  const startDate = parsePlanDate(start);
+  const endDate = parsePlanDate(end);
+  if (!startDate || !endDate) return null;
+  const diff = Math.round(
+    (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)
+  );
+  if (diff < 0) return null;
+  return diff === 0 ? 1 : diff;
+}
+
+/** Normalize agent duration cells ("3 days", auto-calc from dates). */
+export function normalizePlanDuration(
+  raw: string,
+  start = "",
+  end = ""
+): string {
+  const text = stripPlanMarkdown(raw);
+  const fromText = text.match(/^(\d+(?:\.\d+)?)\s*(?:business\s+)?days?\b/i);
+  if (fromText) return fromText[1];
+  if (/^\d+(?:\.\d+)?$/.test(text)) return text;
+
+  const computed = computeDurationDays(start, end);
+  if (computed != null) return String(computed);
+  return text;
+}
+
 const WBS_PREFIX_RE = /^((?:\d+(?:\.\d+)*|M\d+|0))\s+(.+)$/i;
+const NUMERIC_WBS_RE = /^\d+(?:\.\d+)*$/;
+const MILESTONE_WBS_RE = /^M\d+$/i;
+
+/** Work-item WBS ids (1.1, 2.0) — not Smartsheet milestone ids (M1, M2). */
+export function isNumericPlanWbsId(wbsId: string): boolean {
+  return NUMERIC_WBS_RE.test(wbsId.trim());
+}
+
+export function isMilestonePlanWbsId(wbsId: string): boolean {
+  return MILESTONE_WBS_RE.test(wbsId.trim());
+}
+
+export function stripMilestonePrefix(text: string): string {
+  return stripPlanMarkdown(text)
+    .replace(/^MILESTONE:\s*/i, "")
+    .replace(/^milestone:\s*/i, "")
+    .trim();
+}
 
 /** Split a combined "1.1.1 Task name" cell into WBS id and label. */
 export function parseWbsTaskLine(text: string): { wbsId: string; label: string } | null {
@@ -40,7 +122,7 @@ export function formatMilestoneTaskName(title: string): string {
 
 /** Action-verb task names (work items), not phase/milestone headers. */
 const WORK_ITEM_START =
-  /^(finalize|define|build|complete|publish|create|draft|set up|integrate|add|fix|implement|review|schedule|update|develop|test|deploy|identify|conduct|prepare|document|configure|migrate|refactor|pilot training|train|deliver|execute|run|perform|analyze|assess|validate|verify|write|design)\b/i;
+  /^(finalize|define|build|complete|publish|create|draft|set up|integrate|add|fix|implement|review|schedule|update|develop|test|deploy|identify|conduct|prepare|document|configure|migrate|refactor|pilot training|train|deliver|execute|run|perform|analyze|assess|validate|verify|write|design|gather|prototype)\b/i;
 
 /** Detect milestone rows from task description text. */
 export function parseMilestoneDescriptor(taskDesc: string): {
@@ -52,10 +134,10 @@ export function parseMilestoneDescriptor(taskDesc: string): {
   if (boldWrap) {
     const inner = boldWrap[1].trim();
     const labeled = inner.match(/^milestone\s*:\s*(.+)$/i);
-    return {
-      isMilestone: true,
-      title: (labeled?.[1] ?? inner).trim(),
-    };
+    if (labeled) {
+      return { isMilestone: true, title: labeled[1].trim() };
+    }
+    return { isMilestone: false, title: inner };
   }
 
   const text = stripPlanMarkdown(taskDesc);
@@ -74,13 +156,28 @@ export function looksLikeWorkItem(taskDesc: string): boolean {
   const text = stripPlanMarkdown(taskDesc);
   if (/^\d+(\.\d+)+\s/.test(text)) return true;
   if (/^\d+\s+\S/.test(text)) return true;
+  if (/\bspike\b/i.test(text)) return true;
   return WORK_ITEM_START.test(text);
 }
 
+function rowLabel(row: ProjectPlanRow): string {
+  return row.taskName?.trim() || row.taskDesc?.trim() || "";
+}
+
+/** Hard rules: numeric WBS and delivery tasks are never milestones. */
 export function isProjectPlanMilestone(row: ProjectPlanRow): boolean {
+  const wbsId = getPlanWbsId(row);
+  if (wbsId && isNumericPlanWbsId(wbsId)) return false;
+
+  const label = rowLabel(row);
+  if (label && looksLikeWorkItem(label)) return false;
+
+  if (wbsId && isMilestonePlanWbsId(wbsId)) return true;
   if (row.isMilestone) return true;
-  const name = row.taskName ?? row.taskDesc;
-  return parseMilestoneDescriptor(name).isMilestone;
+
+  const fromName = parseMilestoneDescriptor(row.taskName ?? "");
+  const fromDesc = parseMilestoneDescriptor(row.taskDesc);
+  return fromName.isMilestone || fromDesc.isMilestone;
 }
 
 export function getMilestoneTitle(row: ProjectPlanRow): string {
@@ -138,6 +235,9 @@ export function inferMilestonesFromStructure(
 
   for (let i = 0; i < result.length; i++) {
     const label = result[i].taskName ?? result[i].taskDesc;
+    const wbsId = getPlanWbsId(result[i]);
+    if (wbsId && isNumericPlanWbsId(wbsId)) continue;
+    if (looksLikeWorkItem(label)) continue;
     if (
       result[i].isMilestone ||
       parseMilestoneDescriptor(label).isMilestone
@@ -218,7 +318,7 @@ export function assignMilestoneWbsIds(rows: ProjectPlanRow[]): ProjectPlanRow[] 
 function normalizePlanFields(row: ProjectPlanRow): ProjectPlanRow {
   const start = stripPlanMarkdown(row.start);
   const end = stripPlanMarkdown(row.end);
-  const duration = stripPlanMarkdown(row.duration);
+  const duration = normalizePlanDuration(row.duration, row.start, row.end);
   const owner = stripPlanMarkdown(row.owner);
   const dependency = stripPlanMarkdown(row.dependency);
   const comments = stripPlanMarkdown(row.comments);
@@ -260,23 +360,67 @@ function normalizePlanFields(row: ProjectPlanRow): ProjectPlanRow {
   };
 }
 
+function asDeliveryTaskRow(normalized: ProjectPlanRow): ProjectPlanRow {
+  const fromWbs = parseWbsTaskLine(normalized.taskDesc);
+  const rawName =
+    normalized.taskName || fromWbs?.label || normalized.taskDesc;
+  const taskName = stripMilestonePrefix(rawName);
+  const taskDesc = fromWbs
+    ? normalized.taskDesc
+    : normalized.taskName && normalized.taskDesc !== normalized.taskName
+      ? stripMilestonePrefix(normalized.taskDesc)
+      : stripMilestonePrefix(normalized.taskDesc || taskName);
+  return {
+    ...normalized,
+    isMilestone: false,
+    milestoneTitle: undefined,
+    taskName,
+    taskDesc,
+    wbsId: normalized.wbsId || fromWbs?.wbsId,
+  };
+}
+
+function asMilestoneRow(
+  normalized: ProjectPlanRow,
+  title: string
+): ProjectPlanRow {
+  return {
+    ...normalized,
+    isMilestone: true,
+    milestoneTitle: title,
+    taskName: formatMilestoneTaskName(title),
+    duration: "",
+    taskNumber: undefined,
+  };
+}
+
 /** Normalize a plan row from agent output (milestones, markdown cleanup). */
 export function enrichProjectPlanRow(
   row: ProjectPlanRow,
   rowType?: string
 ): ProjectPlanRow {
   const normalized = normalizePlanFields(row);
+  const wbsId = getPlanWbsId(normalized);
+
+  if (wbsId && isNumericPlanWbsId(wbsId)) {
+    return asDeliveryTaskRow(normalized);
+  }
+
+  const label = rowLabel(normalized);
+  if (label && looksLikeWorkItem(label)) {
+    return asDeliveryTaskRow(normalized);
+  }
+
+  if (wbsId && isMilestonePlanWbsId(wbsId)) {
+    const title =
+      normalized.milestoneTitle?.trim() || getMilestoneTitle(normalized);
+    return asMilestoneRow(normalized, title);
+  }
 
   if (normalized.isMilestone) {
     const title =
       normalized.milestoneTitle?.trim() || getMilestoneTitle(normalized);
-    return {
-      ...normalized,
-      isMilestone: true,
-      milestoneTitle: title,
-      taskName: formatMilestoneTaskName(title),
-      duration: "",
-    };
+    return asMilestoneRow(normalized, title);
   }
 
   const typeSaysMilestone = Boolean(
@@ -288,41 +432,23 @@ export function enrichProjectPlanRow(
     typeSaysMilestone || fromName.isMilestone || fromDesc.isMilestone;
 
   if (!isMilestone) {
-    const fromWbs = parseWbsTaskLine(normalized.taskDesc);
-    const taskName =
-      normalized.taskName || fromWbs?.label || normalized.taskDesc;
-    const taskDesc = fromWbs
-      ? normalized.taskDesc
-      : normalized.taskName && normalized.taskDesc !== normalized.taskName
-        ? normalized.taskDesc
-        : normalized.taskDesc || taskName;
-    return {
-      ...normalized,
-      isMilestone: false,
-      taskName,
-      taskDesc,
-      wbsId: normalized.wbsId || fromWbs?.wbsId,
-    };
+    return asDeliveryTaskRow(normalized);
   }
 
   const title = fromName.isMilestone
     ? fromName.title
     : fromDesc.title;
 
-  return {
-    ...normalized,
-    isMilestone: true,
-    milestoneTitle: title,
-    taskName: formatMilestoneTaskName(title),
-    duration: "",
-    taskNumber: undefined,
-  };
+  return asMilestoneRow(normalized, title);
 }
 
 export function enrichProjectPlan(rows: ProjectPlanRow[]): ProjectPlanRow[] {
   const normalized = rows.map((r) => enrichProjectPlanRow(r));
   const withMilestones = inferMilestonesFromStructure(normalized);
-  return assignMilestoneWbsIds(withMilestones);
+  const validated = withMilestones.map((row) =>
+    isProjectPlanMilestone(row) ? row : asDeliveryTaskRow(row)
+  );
+  return assignMilestoneWbsIds(validated);
 }
 
 const JIRA_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/g;

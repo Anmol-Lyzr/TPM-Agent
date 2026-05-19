@@ -1,3 +1,4 @@
+import { filterTrackerIssues } from "@/lib/analytics";
 import { formatAgentTextReply } from "@/lib/formatAgentText";
 import { parseAgentMarkdown } from "@/lib/parseAgentResponse";
 import { filterBugsFromProjectPlan } from "@/lib/projectPlan";
@@ -55,10 +56,11 @@ export function parseAgentOutput(
     raid: fromMarkdown.sections.raid,
   };
 
-  const issues =
+  const issues = filterTrackerIssues(
     fromMarkdown.issues.length > 0
       ? fromMarkdown.issues
-      : (structured?.issues ?? []);
+      : (structured?.issues ?? [])
+  );
 
   const rawPlan =
     fromMarkdown.projectPlan.length > 0

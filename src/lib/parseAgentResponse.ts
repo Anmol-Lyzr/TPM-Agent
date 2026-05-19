@@ -2,10 +2,12 @@ import {
   extractJiraIssuesFromTranscript,
   mergeJiraIssues,
 } from "@/lib/jiraFromTranscript";
+import { filterTrackerIssues } from "@/lib/analytics";
 import {
   enrichProjectPlan,
   enrichProjectPlanRow,
   filterBugsFromProjectPlan,
+  normalizePlanDuration,
 } from "@/lib/projectPlan";
 import {
   buildRaidLog,
@@ -44,16 +46,17 @@ function sectionKeyFromHeading(title: string): SectionKey | null {
   ) {
     return "confluence";
   }
+  if (t.includes("smartsheet") || t.includes("project plan")) {
+    return "smartsheet";
+  }
   if (
     t.includes("jira") ||
     t.includes("issue tracker") ||
-    t.includes("task list") ||
-    t.includes("excel import")
+    t.includes("excel import") ||
+    (t.includes("task list") &&
+      (t.includes("jira") || t.includes("excel") || t.includes("bug")))
   ) {
     return "jira";
-  }
-  if (t.includes("smartsheet") || t.includes("project plan")) {
-    return "smartsheet";
   }
   if (t.includes("raid")) {
     return "raid";
@@ -261,6 +264,9 @@ function parseJiraTable(jiraText: string): JiraIssueRow[] {
       const row = tableRows[i];
       const rawKey = keyIdx >= 0 ? row[keyIdx] : "";
       const keyMatch = rawKey.match(JIRA_KEY_REGEX);
+      if (!keyMatch && /^\d+(?:\.\d+)*$/.test(rawKey.trim())) {
+        continue;
+      }
       const key = keyMatch?.[0] ?? (rawKey.trim() || `NEW-${i}`);
       const summary = summaryIdx >= 0 ? row[summaryIdx] : row[2] ?? "";
 
@@ -330,7 +336,12 @@ function parseSmartsheetTable(smartsheetText: string): ProjectPlanRow[] {
   const endIdx = headers.findIndex(
     (h) => h.includes("end") && !h.includes("dependency")
   );
-  const durationIdx = headers.findIndex((h) => h.includes("duration"));
+  const durationIdx = headers.findIndex(
+    (h) =>
+      h.includes("duration") ||
+      h === "days" ||
+      /^duration\s*\(/.test(h)
+  );
   const ownerIdx = headers.findIndex(
     (h) => h.includes("owner") || h.includes("resource")
   );
@@ -360,7 +371,11 @@ function parseSmartsheetTable(smartsheetText: string): ProjectPlanRow[] {
       taskDesc: taskDesc || taskName,
       start: startIdx >= 0 ? row[startIdx] : "",
       end: endIdx >= 0 ? row[endIdx] : "",
-      duration: durationIdx >= 0 ? row[durationIdx] : "",
+      duration: normalizePlanDuration(
+        durationIdx >= 0 ? row[durationIdx] : "",
+        startIdx >= 0 ? row[startIdx] : "",
+        endIdx >= 0 ? row[endIdx] : ""
+      ),
       owner: ownerIdx >= 0 ? row[ownerIdx] : "",
       dependency: depIdx >= 0 ? row[depIdx] : "",
       status: statusIdx >= 0 ? row[statusIdx] : "",
@@ -502,7 +517,9 @@ export function parseAgentMarkdown(
   const fromTranscriptIssues = options?.transcript?.trim()
     ? extractJiraIssuesFromTranscript(options.transcript)
     : [];
-  const issues = mergeJiraIssues(fromAgent, fromTranscriptIssues);
+  const issues = filterTrackerIssues(
+    mergeJiraIssues(fromAgent, fromTranscriptIssues)
+  );
   const projectPlan = filterBugsFromProjectPlan(
     enrichProjectPlan(parseSmartsheetTable(sections.smartsheet)),
     issues

@@ -4,6 +4,7 @@ import {
   filterBugsFromProjectPlan,
   isBugProjectPlanRow,
   isProjectPlanMilestone,
+  normalizePlanDuration,
   parseMilestoneDescriptor,
 } from "./projectPlan";
 
@@ -47,6 +48,15 @@ const task = enrichProjectPlanRow({
   comments: "",
 });
 assert(!task.isMilestone, "regular task not milestone");
+
+assert(
+  normalizePlanDuration("3 days", "15 May 2026", "18 May 2026") === "3",
+  "strips days suffix from duration"
+);
+assert(
+  normalizePlanDuration("", "20 May 2026", "23 May 2026") === "3",
+  "computes duration from start/end when cell empty"
+);
 
 const agentStyle = enrichProjectPlan([
   {
@@ -162,5 +172,82 @@ const filtered = filterBugsFromProjectPlan(
 );
 assert(filtered.length === 1, "filters bug from plan");
 assert(filtered[0]?.wbsId === "1.1", "keeps delivery task");
+
+const numericWbsMilestone = enrichProjectPlan([
+  {
+    wbsId: "1.0",
+    taskName: "MILESTONE: Product Requirements",
+    taskDesc: "Phase summary",
+    start: "20 May 2026",
+    end: "23 May 2026",
+    duration: "3",
+    owner: "James Rivera",
+    dependency: "",
+    comments: "",
+  },
+  {
+    wbsId: "1.1",
+    taskName: "MILESTONE: Gather stakeholder inputs",
+    taskDesc: "",
+    start: "20 May 2026",
+    end: "21 May 2026",
+    duration: "1",
+    owner: "James Rivera",
+    dependency: "",
+    comments: "",
+  },
+  {
+    wbsId: "1.1.1",
+    taskName: "Finalize product requirements v1.0",
+    taskDesc: "",
+    start: "20 May 2026",
+    end: "23 May 2026",
+    duration: "3",
+    owner: "James Rivera",
+    dependency: "",
+    comments: "",
+  },
+]);
+assert(
+  !numericWbsMilestone.some((r) => r.wbsId === "1.0" && r.isMilestone),
+  "numeric WBS 1.0 is not a milestone"
+);
+assert(
+  numericWbsMilestone.find((r) => r.wbsId === "1.0")?.taskName === "Product Requirements",
+  "strips MILESTONE prefix from mislabeled task"
+);
+assert(
+  !numericWbsMilestone.some((r) => r.wbsId === "1.1" && r.isMilestone),
+  "numeric WBS 1.1 is not a milestone"
+);
+
+const transcriptTasks = enrichProjectPlan([
+  {
+    wbsId: "1.1",
+    taskName: "Finalize product requirements v1.0",
+    taskDesc: "",
+    start: "20 May 2026",
+    end: "23 May 2026",
+    duration: "3",
+    owner: "James Rivera",
+    dependency: "",
+    comments: "",
+  },
+  {
+    wbsId: "2.1",
+    taskName: "Fort Liberty SSO and lease sync spike",
+    taskDesc: "",
+    start: "21 May 2026",
+    end: "27 May 2026",
+    duration: "5",
+    owner: "Elena Vasquez",
+    dependency: "1.1",
+    comments: "",
+  },
+]);
+assert(
+  transcriptTasks.every((r) => !r.isMilestone),
+  "transcript delivery tasks stay tasks"
+);
 
 console.log("projectPlan.test.ts: all assertions passed");

@@ -24,8 +24,18 @@ export function sessionHasOutput(parsed?: ParsedAgentResponse): boolean {
 
 export function isBugIssue(issue: JiraIssueRow): boolean {
   const type = issue.issueType?.trim();
-  if (!type) return false;
-  return /bug/i.test(type);
+  if (type) return /bug|defect/i.test(type);
+  return /\b(bug|defect|regression)\b/i.test(issue.summary);
+}
+
+/** Issue Tracker shows bugs/defects only — not Jira Task/Story rows or misrouted plan rows. */
+export function filterTrackerIssues(issues: JiraIssueRow[]): JiraIssueRow[] {
+  return issues.filter((issue) => {
+    if (issue.key.startsWith("NEW-")) return false;
+    const type = issue.issueType?.trim();
+    if (type && !/bug|defect/i.test(type)) return false;
+    return isBugIssue(issue);
+  });
 }
 
 export function countDistinctBugKeys(

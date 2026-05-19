@@ -5,7 +5,14 @@ function assert(condition: boolean, message: string) {
 }
 
 const jsonReply = JSON.stringify({
-  issues: [{ key: "HMC-1", summary: "Test", action: "unknown" }],
+  issues: [
+    {
+      key: "HMC-1",
+      summary: "Test defect",
+      action: "unknown",
+      issueType: "Bug",
+    },
+  ],
   projectPlan: [
     {
       taskDesc: "**Milestone: Phase A**",
@@ -33,9 +40,9 @@ Hello world.
 
 2. JIRA — Task list
 
-| Key | Summary | Status |
-| --- | --- | --- |
-| X-1 | Item | Open |
+| Issue Type | Key | Summary | Status |
+| --- | --- | --- | --- |
+| Bug | X-1 | Item | Open |
 
 3. Smartsheet — Project plan
 

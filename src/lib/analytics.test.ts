@@ -1,6 +1,7 @@
 import {
   computeDashboardAnalytics,
   countDistinctBugKeys,
+  filterTrackerIssues,
   isBugIssue,
   sessionHasOutput,
 } from "./analytics";
@@ -9,7 +10,7 @@ import type { ParsedAgentResponse } from "@/types/tpm";
 import { emptyParsed as baseEmptyParsed } from "./constants";
 
 function emptyParsed(): ParsedAgentResponse {
-  return baseEmptyParsed;
+  return JSON.parse(JSON.stringify(baseEmptyParsed)) as ParsedAgentResponse;
 }
 
 function assert(condition: boolean, message: string) {
@@ -33,6 +34,19 @@ assert(isBugIssue({ key: "X-1", summary: "x", action: "unknown" }) === false, "n
 assert(isBugIssue({ key: "X-1", summary: "x", action: "unknown", issueType: "Task" }) === false, "Task is not bug");
 assert(isBugIssue({ key: "X-1", summary: "x", action: "unknown", issueType: "Bug" }) === true, "Bug type matches");
 assert(isBugIssue({ key: "X-1", summary: "x", action: "unknown", issueType: "Sub-bug" }) === true, "substring bug matches");
+assert(
+  isBugIssue({ key: "X-1", summary: "Regression bug on login", action: "unknown" }) === true,
+  "infers bug from summary when type missing"
+);
+
+assert(
+  filterTrackerIssues([
+    { key: "SCRUM-1", summary: "a", action: "unknown", issueType: "Bug" },
+    { key: "SCRUM-2", summary: "b", action: "unknown", issueType: "Task" },
+    { key: "NEW-1", summary: "c", action: "unknown", issueType: "Bug" },
+  ]).length === 1,
+  "tracker filter keeps bugs only"
+);
 
 // countDistinctBugKeys
 const sessions = [

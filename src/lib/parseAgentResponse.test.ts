@@ -57,7 +57,14 @@ assert(
   parsed.sections.confluence.includes("Add comment to SCRUM-3"),
   "Confluence must contain action item 1"
 );
-assert(parsed.issues.length >= 2, `Expected JIRA rows, got ${parsed.issues.length}`);
+assert(
+  parsed.issues.length === 0,
+  "Issue tracker excludes Jira Task rows; fixture tasks stay in raw JIRA section only"
+);
+assert(
+  parsed.sections.jira.includes("SCRUM-3"),
+  "raw JIRA section still contains task list markdown"
+);
 assert(parsed.projectPlan.length >= 2, `Expected plan rows, got ${parsed.projectPlan.length}`);
 assert(
   Boolean(parsed.meetingMinutes.rawBody?.includes("Summary")),
@@ -159,6 +166,38 @@ const phaseParsed = parseAgentResponse(AGENT_PHASE_PLAN);
 assert(
   phaseParsed.projectPlan[0]?.isMilestone === true,
   "infers milestone from agent phase header without Milestone: prefix"
+);
+
+const SMARTSHEET_TASK_LIST = `3. Smartsheet task list
+
+| WBS ID | Task Name | Start Date | End Date | Duration (Days) | Owner |
+| --- | --- | --- | --- | --- | --- |
+| 1.1 | Requirements | 20 May 2026 | 23 May 2026 | 3 | James Rivera |
+`;
+
+const smartsheetListParsed = parseAgentResponse(SMARTSHEET_TASK_LIST);
+assert(
+  smartsheetListParsed.projectPlan.length === 1,
+  "Smartsheet task list routes to project plan, not issue tracker"
+);
+assert(
+  smartsheetListParsed.issues.length === 0,
+  "project plan rows must not appear as Jira issues"
+);
+assert(
+  smartsheetListParsed.projectPlan[0]?.duration === "3",
+  "parses Duration (Days) column"
+);
+
+const DURATION_DAYS = parseAgentResponse(`3. Smartsheet — Project plan
+
+| Task Desc | Start | End | Duration (Auto calc) | Owner |
+| --- | --- | --- | --- | --- |
+| 1 Complete the RPT Tracker | 15 May 2026 | 18 May 2026 | 3 days | Monisha |
+`);
+assert(
+  DURATION_DAYS.projectPlan[0]?.duration === "3",
+  "normalizes duration values like '3 days'"
 );
 
 console.log("parseAgentResponse: all tests passed");
