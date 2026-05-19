@@ -40,7 +40,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Usage
 
 1. Click **Load sample** to fill a mock MS Teams transcript, or paste your own.
-2. Click **Analyze Meeting** — the agent runs Jira and Confluence tools (30–90 seconds).
+2. Click **Analyze Meeting** — the agent runs Jira and Confluence tools (often 2–5 minutes on long transcripts).
 3. Review the four dashboard panels.
 4. Click **New Meeting** to start a fresh session.
 
@@ -53,6 +53,12 @@ The UI calls `POST /api/agent`, which proxies to Lyzr `v3/inference/chat/`. The 
 ```bash
 npm run test:parser
 ```
+
+## Deploying on Vercel
+
+- Set `LYZR_API_KEY`, `LYZR_AGENT_ID`, `LYZR_USER_ID`, and `MONGODB_URI` in the Vercel project environment.
+- **Function timeout:** `/api/agent` is configured for up to **300 seconds** (`maxDuration` + `vercel.json`). That requires a **Vercel Pro** (or Enterprise) plan; Hobby caps at 10s. If analysis still times out, the UI will show a clear timeout message instead of a JSON parse error.
+- Long meeting transcripts trigger multiple Lyzr tool calls; expect multi-minute runs in production.
 
 ## Security
 

@@ -4,7 +4,8 @@ import { callAgent, createSessionId } from "@/lib/lyzr";
 import { parseAgentOutput } from "@/lib/agent/pipeline";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// Full transcript + Lyzr tool calls often exceed 120s; Pro allows up to 300s.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
