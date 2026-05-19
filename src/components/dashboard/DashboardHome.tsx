@@ -2,9 +2,16 @@
 
 import { type ComponentType } from "react";
 import Link from "next/link";
-import { ArrowRight, Bug, Calendar, FileText, ListTodo, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Bug,
+  CheckCircle2,
+  FolderKanban,
+  ListTodo,
+  Sparkles,
+} from "lucide-react";
 import { motion } from "framer-motion";
-import { useStoredSession } from "@/hooks/useStoredSession";
+import { useDashboardAnalytics } from "@/hooks/useDashboardAnalytics";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -42,18 +49,9 @@ function StatCard({
 }
 
 export function DashboardHome() {
-  const { sessionId, parsed, ready } = useStoredSession();
+  const { analytics, ready, error } = useDashboardAnalytics();
 
-  const hasSession = Boolean(sessionId);
-  const hasData =
-    parsed.projectPlan.length > 0 ||
-    parsed.issues.length > 0 ||
-    parsed.tasks.length > 0 ||
-    Boolean(parsed.meetingMinutes.rawBody);
-
-  const scheduledTasks = parsed.tasks.filter(
-    (t) => t.status === "Scheduled"
-  ).length;
+  const display = (n: number) => (ready ? n : "—");
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto w-full">
@@ -64,52 +62,42 @@ export function DashboardHome() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Meeting intelligence — plans, issues, tasks, and minutes from MS Teams transcripts.
+          Combined analytics across all meeting sessions — plans, issues, RAID log, and minutes.
         </p>
       </div>
+
+      {error ? (
+        <p className="mb-4 text-sm text-destructive">{error}</p>
+      ) : null}
 
       {/* Stat cards */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6"
       >
         <StatCard
-          label="Project plan"
-          value={ready ? parsed.projectPlan.length : "—"}
-          hint="Smartsheet rows"
-          icon={Calendar}
+          label="Overall projects"
+          value={display(analytics.overallProjects)}
+          hint="Meetings with analyzed output"
+          icon={FolderKanban}
         />
         <StatCard
-          label="Jira issues"
-          value={ready ? parsed.issues.length : "—"}
-          hint="Tracked issues"
+          label="Total bugs"
+          value={display(analytics.totalBugs)}
+          hint="Bug-type Jira issues (deduped by key)"
           icon={Bug}
         />
         <StatCard
-          label="Tasks"
-          value={ready ? parsed.tasks.length : "—"}
-          hint={`${scheduledTasks} scheduled`}
-          icon={ListTodo}
-        />
-        <StatCard
-          label="Meeting minutes"
-          value={
-            ready
-              ? parsed.meetingMinutes.rawBody
-                ? "Ready"
-                : parsed.meetingMinutes.title
-                  ? "Partial"
-                  : "—"
-              : "—"
-          }
-          hint="Confluence summary"
-          icon={FileText}
+          label="Completed projects"
+          value={display(analytics.completedProjects)}
+          hint="Sessions with plan, issues, RAID log, or MoM"
+          icon={CheckCircle2}
         />
       </motion.div>
 
-      {/* Session status + Quick start */}
+      {/* Across all sessions + Quick start */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -119,26 +107,20 @@ export function DashboardHome() {
         <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden lg:col-span-2">
           <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
             <Sparkles className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Session status</h2>
+            <h2 className="text-sm font-semibold text-foreground">Across all sessions</h2>
           </div>
           <div className="p-5">
             <p className="text-sm text-muted-foreground mb-4">
-              {hasSession ? (
+              {ready ? (
                 <>
-                  Active workspace session
-                  {hasData
-                    ? " with analyzed meeting output."
-                    : " — open the workspace to analyze a transcript."}
+                  {analytics.totalSessions === 0
+                    ? "No sessions yet. Start in the workspace with a meeting transcript."
+                    : `${analytics.totalSessions} workspace session${analytics.totalSessions === 1 ? "" : "s"} stored — ${analytics.overallProjects} with analyzed meeting output.`}
                 </>
               ) : (
-                "No active session. Start in the workspace with a meeting transcript."
+                "Loading session analytics…"
               )}
             </p>
-            {hasSession && sessionId ? (
-              <p className="mb-4 truncate rounded-lg bg-black/[0.04] px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                {sessionId}
-              </p>
-            ) : null}
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/workspace"
@@ -148,20 +130,8 @@ export function DashboardHome() {
                 Open workspace
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              {hasData ? (
-                <Link
-                  href="/workspace"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
-                >
-                  Continue editing
-                </Link>
-              ) : null}
               <Link
-                href={
-                  sessionId
-                    ? `/session?id=${encodeURIComponent(sessionId)}`
-                    : "/session"
-                }
+                href="/session"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
               >
                 Browse sessions

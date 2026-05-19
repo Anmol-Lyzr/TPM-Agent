@@ -49,7 +49,7 @@ export function AppShell({
             href="/session"
             active={activeNav === "session"}
             icon={Search}
-            label="View session"
+            label="Projects"
           />
           <RailButton icon={Settings} label="Settings" disabled />
         </nav>

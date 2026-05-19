@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:parser": "tsx src/lib/parseAgentResponse.test.ts"
+    "test:parser": "tsx src/lib/parseAgentResponse.test.ts",
+    "test:analytics": "tsx src/lib/analytics.test.ts",
+    "test:raid": "tsx src/lib/raidLog.test.ts",
+    "test:jira": "tsx src/lib/jiraFromTranscript.test.ts",
+    "test:plan": "tsx src/lib/projectPlan.test.ts",
+    "test:pipeline": "tsx src/lib/agent/pipeline.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -29,7 +34,8 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

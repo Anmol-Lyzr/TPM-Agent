@@ -57,7 +57,7 @@
         - main [ref=e85]:
           - generic [ref=e86]:
             - generic [ref=e88]:
-              - heading "Session viewer" [level=2] [ref=e89]
+              - heading "" [level=2] [ref=e89]
               - paragraph [ref=e90]: Select a session from the list to view its output
             - generic [ref=e91]:
               - generic [ref=e92]:

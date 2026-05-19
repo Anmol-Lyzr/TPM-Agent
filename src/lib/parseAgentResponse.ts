@@ -1,76 +1,201 @@
+import {
+  extractJiraIssuesFromTranscript,
+  mergeJiraIssues,
+} from "@/lib/jiraFromTranscript";
+import { enrichProjectPlan, enrichProjectPlanRow } from "@/lib/projectPlan";
+import {
+  buildRaidLog,
+  extractBulletsUnderHeader,
+  formatRaidLogMarkdown,
+  parseConfluenceRaidLists,
+} from "@/lib/raidLog";
 import type {
   JiraAction,
   JiraIssueRow,
   MeetingMinutes,
   ParsedAgentResponse,
   ProjectPlanRow,
-  TaskRow,
 } from "@/types/tpm";
 
 import type { AgentMainSections } from "@/types/tpm";
 
-/** Major outputs only — do NOT split on "1. Add comment…" inside MoM */
-const MAJOR_SECTION_LINE =
-  /^\d+\.\s*(Confluence|JIRA|Jira|Smartsheet)\b/i;
+type SectionKey = keyof AgentMainSections;
 
-const H3_SECTION_LINE = /^###\s+(.+)$/;
+/** Map agent section titles to canonical buckets (matches TPM agent output). */
+function sectionKeyFromHeading(title: string): SectionKey | null {
+  const t = title
+    .replace(/\*\*/g, "")
+    .replace(/^#+\s*/, "")
+    .replace(/^\d+\.\s*/, "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    t.includes("confluence") ||
+    t.includes("meeting summary") ||
+    t.includes("minutes of meeting") ||
+    t === "mom" ||
+    (t.includes("meeting") &&
+      (t.includes("summary") || t.includes("minutes") || t.includes("notes")))
+  ) {
+    return "confluence";
+  }
+  if (
+    t.includes("jira") ||
+    t.includes("issue tracker") ||
+    t.includes("task list") ||
+    t.includes("excel import")
+  ) {
+    return "jira";
+  }
+  if (t.includes("smartsheet") || t.includes("project plan")) {
+    return "smartsheet";
+  }
+  if (t.includes("raid")) {
+    return "raid";
+  }
+  return null;
+}
+
+/** Detect numbered / markdown section headers from agent output. */
+function parseSectionHeader(line: string): SectionKey | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  const h = trimmed.match(/^#{1,4}\s+(.+)$/);
+  if (h) return sectionKeyFromHeading(h[1]);
+
+  const numbered = trimmed.match(
+    /^(?:\*\*)?\d+\.\s*(.+?)(?:\*\*)?(?:\s*[—\-:|]\s*(.*))?$/i
+  );
+  if (numbered) {
+    const combined = [numbered[1], numbered[2]].filter(Boolean).join(" — ");
+    return sectionKeyFromHeading(combined);
+  }
+
+  const boldOnly = trimmed.match(/^\*\*(.+?)\*\*\s*$/);
+  if (boldOnly) return sectionKeyFromHeading(boldOnly[1]);
+
+  if (
+    /^(confluence|jira|smartsheet|raid)\b/i.test(trimmed) &&
+    /[—\-:|]/.test(trimmed)
+  ) {
+    return sectionKeyFromHeading(trimmed);
+  }
+
+  return null;
+}
+
+export interface SectionExtractResult {
+  sections: AgentMainSections;
+  extensions: Record<string, string>;
+  sectionKeysFound: string[];
+  extensionKeysFound: string[];
+}
+
+function slugifyExtensionKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 48);
+}
+
+function parseUnknownSectionHeader(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  // MoM numbered action items — not top-level agent sections
+  if (/^\d+\.\s+[a-z]/.test(trimmed)) return null;
+  if (/owner:|due:|priority:|assignee:/i.test(trimmed)) return null;
+
+  const h = trimmed.match(/^#{1,4}\s+(.+)$/);
+  if (h && !sectionKeyFromHeading(h[1])) return h[1].trim();
+
+  const numbered = trimmed.match(
+    /^(?:\*\*)?\d+\.\s*(.+?)(?:\*\*)?(?:\s*[—\-:|]\s*(.*))?$/i
+  );
+  if (numbered) {
+    const combined = [numbered[1], numbered[2]].filter(Boolean).join(" — ");
+    const title = combined.trim();
+    if (!sectionKeyFromHeading(title) && /^[A-Z]/.test(title)) {
+      return title;
+    }
+  }
+
+  const boldOnly = trimmed.match(/^\*\*(.+?)\*\*\s*$/);
+  if (boldOnly && !sectionKeyFromHeading(boldOnly[1])) return boldOnly[1].trim();
+
+  return null;
+}
 
 /**
- * Extract the three agent output blocks (Confluence, JIRA, Smartsheet).
- * Matches Lyzr Studio format: "1. Confluence — …", "2. JIRA — …", "3. Smartsheet — …"
+ * Extract agent output blocks (Confluence, JIRA, Smartsheet, RAID) plus extension sections.
  */
-function extractMainSections(markdown: string): AgentMainSections {
-  const result: AgentMainSections = {
-    confluence: "",
-    jira: "",
-    smartsheet: "",
-  };
-
-  const lines = markdown.split("\n");
-  type SectionKey = keyof AgentMainSections;
-  let current: SectionKey | null = null;
+export function extractMainSections(markdown: string): SectionExtractResult {
   const buffers: Record<SectionKey, string[]> = {
     confluence: [],
     jira: [],
     smartsheet: [],
+    raid: [],
   };
+  const extensionBuffers: Record<string, string[]> = {};
+  const sectionKeysFound: string[] = [];
+  const extensionKeysFound: string[] = [];
 
-  const assignBuffer = (key: SectionKey) => {
-    current = key;
-  };
+  let current: SectionKey | null = null;
+  let currentExtension: string | null = null;
 
-  for (const line of lines) {
-    const h3 = line.match(H3_SECTION_LINE);
-    if (h3) {
-      const title = h3[1].toLowerCase();
-      if (title.includes("confluence") || title.includes("meeting")) {
-        assignBuffer("confluence");
-      } else if (title.includes("jira") || title.includes("results")) {
-        assignBuffer("jira");
-      } else if (title.includes("smartsheet") || title.includes("project plan")) {
-        assignBuffer("smartsheet");
+  for (const line of markdown.split("\n")) {
+    const section = parseSectionHeader(line);
+    if (section) {
+      current = section;
+      currentExtension = null;
+      if (!sectionKeysFound.includes(section)) sectionKeysFound.push(section);
+      continue;
+    }
+
+    const unknownTitle =
+      current === null && !currentExtension
+        ? parseUnknownSectionHeader(line)
+        : null;
+    if (unknownTitle) {
+      current = null;
+      currentExtension = slugifyExtensionKey(unknownTitle);
+      if (!extensionKeysFound.includes(currentExtension)) {
+        extensionKeysFound.push(currentExtension);
       }
+      extensionBuffers[currentExtension] =
+        extensionBuffers[currentExtension] ?? [];
       continue;
     }
 
-    if (MAJOR_SECTION_LINE.test(line)) {
-      const lower = line.toLowerCase();
-      if (lower.includes("confluence")) assignBuffer("confluence");
-      else if (lower.includes("jira")) assignBuffer("jira");
-      else if (lower.includes("smartsheet")) assignBuffer("smartsheet");
-      continue;
-    }
-
-    if (current === "confluence") buffers.confluence.push(line);
+    if (currentExtension && extensionBuffers[currentExtension]) {
+      extensionBuffers[currentExtension].push(line);
+    } else if (current === "confluence") buffers.confluence.push(line);
     else if (current === "jira") buffers.jira.push(line);
     else if (current === "smartsheet") buffers.smartsheet.push(line);
+    else if (current === "raid") buffers.raid.push(line);
   }
 
-  result.confluence = buffers.confluence.join("\n").trim();
-  result.jira = buffers.jira.join("\n").trim();
-  result.smartsheet = buffers.smartsheet.join("\n").trim();
+  const extensions = Object.fromEntries(
+    Object.entries(extensionBuffers).map(([k, lines]) => [
+      k,
+      lines.join("\n").trim(),
+    ])
+  );
 
-  return result;
+  return {
+    sections: {
+      confluence: buffers.confluence.join("\n").trim(),
+      jira: buffers.jira.join("\n").trim(),
+      smartsheet: buffers.smartsheet.join("\n").trim(),
+      raid: buffers.raid.join("\n").trim(),
+    },
+    extensions,
+    sectionKeysFound,
+    extensionKeysFound,
+  };
 }
 
 function parseMarkdownTable(tableText: string): string[][] {
@@ -176,50 +301,73 @@ function parseSmartsheetTable(smartsheetText: string): ProjectPlanRow[] {
   if (rows.length < 2) return [];
 
   const headers = rows[0].map((h) => h.toLowerCase());
-  const descIdx = headers.findIndex(
-    (h) => h.includes("task") || h.includes("desc")
+  const wbsIdx = headers.findIndex((h) => h.includes("wbs"));
+  const nameIdx = headers.findIndex(
+    (h) => h.includes("task name") || (h === "task" && !h.includes("desc"))
   );
+  const descIdx = headers.findIndex(
+    (h) =>
+      h.includes("task description") ||
+      h.includes("task desc") ||
+      (h.includes("desc") && !h.includes("dependency")) ||
+      h.includes("activity")
+  );
+  const legacyDescIdx =
+    descIdx < 0
+      ? headers.findIndex(
+          (h) =>
+            (h.includes("task") || h.includes("name")) &&
+            !h.includes("wbs") &&
+            nameIdx < 0
+        )
+      : -1;
+  const taskDescIdx = descIdx >= 0 ? descIdx : legacyDescIdx;
   const startIdx = headers.findIndex((h) => h.includes("start"));
   const endIdx = headers.findIndex(
     (h) => h.includes("end") && !h.includes("dependency")
   );
   const durationIdx = headers.findIndex((h) => h.includes("duration"));
-  const ownerIdx = headers.findIndex((h) => h.includes("owner"));
+  const ownerIdx = headers.findIndex(
+    (h) => h.includes("owner") || h.includes("resource")
+  );
   const depIdx = headers.findIndex(
     (h) => h.includes("dependency") || h.includes("predecessor")
   );
-  const commentsIdx = headers.findIndex((h) => h.includes("comment"));
+  const statusIdx = headers.findIndex((h) => h.includes("status"));
+  const priorityIdx = headers.findIndex((h) => h.includes("priority"));
+  const commentsIdx = headers.findIndex(
+    (h) => h.includes("comment") || h.includes("notes")
+  );
+  const typeIdx = headers.findIndex(
+    (h) => h === "type" || h.includes("row type") || h.includes("task type")
+  );
 
   const plan: ProjectPlanRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const taskDesc = descIdx >= 0 ? row[descIdx] : row[0] ?? "";
-    if (!taskDesc) continue;
+    const taskName = nameIdx >= 0 ? row[nameIdx] : "";
+    const taskDesc =
+      (taskDescIdx >= 0 ? row[taskDescIdx] : taskName || row[0]) ?? "";
+    if (!taskDesc && !taskName) continue;
 
-    plan.push({
-      taskDesc,
+    const base: ProjectPlanRow = {
+      wbsId: wbsIdx >= 0 ? row[wbsIdx] : "",
+      taskName: taskName || undefined,
+      taskDesc: taskDesc || taskName,
       start: startIdx >= 0 ? row[startIdx] : "",
       end: endIdx >= 0 ? row[endIdx] : "",
       duration: durationIdx >= 0 ? row[durationIdx] : "",
       owner: ownerIdx >= 0 ? row[ownerIdx] : "",
       dependency: depIdx >= 0 ? row[depIdx] : "",
+      status: statusIdx >= 0 ? row[statusIdx] : "",
+      priority: priorityIdx >= 0 ? row[priorityIdx] : "",
       comments: commentsIdx >= 0 ? row[commentsIdx] : "",
-      taskNumber: extractTaskNumber(taskDesc),
-    });
+      taskNumber: extractTaskNumber(taskDesc || taskName),
+    };
+    const rowType = typeIdx >= 0 ? row[typeIdx] : undefined;
+    plan.push(enrichProjectPlanRow(base, rowType));
   }
   return plan;
-}
-
-export function projectPlanToTasks(plan: ProjectPlanRow[]): TaskRow[] {
-  return plan.map((row) => ({
-    taskNumber: row.taskNumber ?? 0,
-    description: row.taskDesc.replace(/^\d+\s+/, ""),
-    owner: row.owner,
-    start: row.start,
-    end: row.end,
-    dependency: row.dependency,
-    status: row.start || row.end ? "Scheduled" : "Unscheduled",
-  }));
 }
 
 function extractConfluenceLink(text: string): {
@@ -247,10 +395,51 @@ function extractMeetingTitle(confluenceText: string): string | undefined {
     if (/^#+\s/.test(l)) continue;
     if (/^(date|summary|decisions|action|risk|open)\b/i.test(l)) continue;
     if (/^[-*•]/.test(l)) continue;
-    if (/^\d+\.\s/.test(l) && !MAJOR_SECTION_LINE.test(l)) continue;
+    if (/^\d+\.\s/.test(l) && !parseSectionHeader(l)) continue;
     return l.replace(/^#+\s*/, "").replace(/^\*\*|\*\*$/g, "").trim();
   }
   return undefined;
+}
+
+function extractMomDate(text: string): string | undefined {
+  for (const line of text.split("\n")) {
+    const m = line.match(
+      /^(?:[-*•]\s*)?(?:\*\*)?Date(?:\s*\/\s*attendees?)?(?:\*\*)?\s*:?\s*(.+)$/i
+    );
+    if (m?.[1] && !/^attendees?\b/i.test(m[1].trim())) {
+      return m[1].trim();
+    }
+  }
+  return undefined;
+}
+
+function extractMomSummary(text: string): string | undefined {
+  const lines = text.split("\n");
+  let inSummary = false;
+  const parts: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^summary\b/i.test(trimmed)) {
+      inSummary = true;
+      const inline = trimmed.replace(/^summary\s*:?\s*/i, "").trim();
+      if (inline) parts.push(inline);
+      continue;
+    }
+    if (inSummary) {
+      if (
+        /^(decisions?|action\s*items?|risks?|open questions?|attendees?|date\b)/i.test(
+          trimmed
+        )
+      ) {
+        break;
+      }
+      if (trimmed) parts.push(trimmed.replace(/^[-*•]\s+/, ""));
+    }
+  }
+
+  const joined = parts.join(" ").trim();
+  return joined || undefined;
 }
 
 function parseMeetingMinutes(
@@ -258,47 +447,95 @@ function parseMeetingMinutes(
   fullMarkdown: string
 ): MeetingMinutes {
   const { url, title } = extractConfluenceLink(fullMarkdown);
+  const raidLists = parseConfluenceRaidLists(confluenceText);
 
-  const minutes: MeetingMinutes = {
-    attendees: [],
-    decisions: [],
-    actionItems: [],
-    risks: [],
-    openQuestions: [],
+  const attendees = extractBulletsUnderHeader(
+    confluenceText,
+    /^attendees?\b/i
+  );
+  const decisions = extractBulletsUnderHeader(
+    confluenceText,
+    /^decisions?\b/i
+  );
+  const actionItems = extractBulletsUnderHeader(
+    confluenceText,
+    /^action\s*items?(?:\s*&\s*next\s*steps?)?\b/i
+  );
+
+  return {
+    title: extractMeetingTitle(confluenceText),
+    date: extractMomDate(confluenceText),
+    summary: extractMomSummary(confluenceText),
+    attendees,
+    decisions,
+    actionItems,
+    risks: raidLists.risks,
+    openQuestions: raidLists.openQuestions,
     confluenceLink: url ?? undefined,
     confluenceTitle: title ?? undefined,
     rawBody: confluenceText.trim(),
-    title: extractMeetingTitle(confluenceText),
   };
-
-  return minutes;
 }
 
-export function parseAgentResponse(markdown: string): ParsedAgentResponse {
-  const sections = extractMainSections(markdown);
+/** Markdown-only parse (used by pipeline and tests). */
+export function parseAgentMarkdown(
+  markdown: string,
+  options?: { transcript?: string }
+): Omit<
+  ParsedAgentResponse,
+  "sourceMarkdown" | "extensions" | "extra" | "parseMeta"
+> & {
+  extensions: Record<string, string>;
+  sectionKeysFound: string[];
+  extensionKeysFound: string[];
+} {
+  const extracted = extractMainSections(markdown);
+  const sections = extracted.sections;
   const { url: confluenceLink, title: confluenceTitle } =
     extractConfluenceLink(markdown);
 
-  const issues = parseJiraTable(sections.jira);
-  const projectPlan = parseSmartsheetTable(sections.smartsheet);
-  const tasks = projectPlanToTasks(projectPlan);
+  const fromAgent = parseJiraTable(sections.jira);
+  const fromTranscriptIssues = options?.transcript?.trim()
+    ? extractJiraIssuesFromTranscript(options.transcript)
+    : [];
+  const issues = mergeJiraIssues(fromAgent, fromTranscriptIssues);
+  const projectPlan = enrichProjectPlan(parseSmartsheetTable(sections.smartsheet));
   const meetingMinutes = parseMeetingMinutes(sections.confluence, markdown);
 
   if (!meetingMinutes.title && confluenceTitle) {
     meetingMinutes.title = confluenceTitle;
   }
 
+  const raidLog = buildRaidLog(
+    sections.raid,
+    sections.confluence,
+    meetingMinutes,
+    options?.transcript,
+    issues
+  );
+
+  const raidSection =
+    sections.raid.trim() || formatRaidLogMarkdown(raidLog);
+
   return {
     issues,
     projectPlan,
-    tasks,
+    raidLog,
     meetingMinutes,
     confluenceLink,
     rawSections: {
       confluence: sections.confluence,
       jira: sections.jira,
       smartsheet: sections.smartsheet,
+      raid: raidSection,
     },
-    sections,
+    sections: {
+      ...sections,
+      raid: raidSection,
+    },
+    extensions: extracted.extensions,
+    sectionKeysFound: extracted.sectionKeysFound,
+    extensionKeysFound: extracted.extensionKeysFound,
   };
 }
+

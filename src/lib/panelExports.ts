@@ -2,7 +2,7 @@ import type {
   JiraIssueRow,
   MeetingMinutes,
   ProjectPlanRow,
-  TaskRow,
+  RaidLogRow,
 } from "@/types/tpm";
 import {
   exportHtmlToWordDocument,
@@ -13,6 +13,28 @@ import {
   datedFilename,
   type SheetRow,
 } from "@/lib/export";
+import {
+  getPlanTaskDescription,
+  getPlanTaskName,
+  getPlanWbsId,
+  PROJECT_PLAN_COLUMNS,
+} from "@/lib/projectPlan";
+
+function projectPlanToSheetRow(row: ProjectPlanRow): SheetRow {
+  return {
+    [PROJECT_PLAN_COLUMNS[0]]: getPlanWbsId(row),
+    [PROJECT_PLAN_COLUMNS[1]]: getPlanTaskName(row),
+    [PROJECT_PLAN_COLUMNS[2]]: getPlanTaskDescription(row),
+    [PROJECT_PLAN_COLUMNS[3]]: row.owner,
+    [PROJECT_PLAN_COLUMNS[4]]: row.start,
+    [PROJECT_PLAN_COLUMNS[5]]: row.end,
+    [PROJECT_PLAN_COLUMNS[6]]: row.duration,
+    [PROJECT_PLAN_COLUMNS[7]]: row.dependency,
+    [PROJECT_PLAN_COLUMNS[8]]: row.status ?? "",
+    [PROJECT_PLAN_COLUMNS[9]]: row.priority ?? "",
+    [PROJECT_PLAN_COLUMNS[10]]: row.comments,
+  };
+}
 
 function resolveExcelRows(
   structured: SheetRow[],
@@ -57,17 +79,9 @@ export function exportProjectPlanExcel(
   sectionMarkdown?: string
 ): void {
   exportPanelExcel(
-    rows.map((r) => ({
-      "Task Desc": r.taskDesc,
-      Start: r.start,
-      End: r.end,
-      Duration: r.duration,
-      Owner: r.owner,
-      "Dependency/ Predecessor": r.dependency,
-      Comments: r.comments,
-    })),
+    rows.map(projectPlanToSheetRow),
     "TPM-Project-Plan",
-    "Project Plan",
+    "Project WBS",
     sectionMarkdown
   );
 }
@@ -79,29 +93,18 @@ export function exportProjectPlanDocument(
   const docHtml =
     rows.length > 0
       ? rowsToHtmlTable(
-          [
-            "Task Desc",
-            "Start",
-            "End",
-            "Duration",
-            "Owner",
-            "Dependency/ Predecessor",
-            "Comments",
-          ],
-          rows.map((r) => [
-            r.taskDesc,
-            r.start,
-            r.end,
-            r.duration,
-            r.owner,
-            r.dependency,
-            r.comments,
-          ])
+          [...PROJECT_PLAN_COLUMNS],
+          rows.map((r) => {
+            const sheet = projectPlanToSheetRow(r);
+            return PROJECT_PLAN_COLUMNS.map(
+              (col) => String(sheet[col] ?? "")
+            );
+          })
         )
       : "";
   exportPanelDocument(
     "TPM-Project-Plan",
-    "Project Plan — Smartsheet Schedule",
+    "Project Plan — Smartsheet WBS",
     docHtml,
     sectionMarkdown
   );
@@ -153,48 +156,60 @@ export function exportIssueTrackerDocument(
   );
 }
 
-export function exportTaskTrackerExcel(
-  tasks: TaskRow[],
+export function exportRaidLogExcel(
+  raidLog: RaidLogRow[],
   sectionMarkdown?: string
 ): void {
   exportPanelExcel(
-    tasks.map((t) => ({
-      "#": t.taskNumber || "",
-      Description: t.description,
-      Owner: t.owner,
-      Start: t.start,
-      End: t.end,
-      Dependency: t.dependency,
-      Status: t.status,
+    raidLog.map((r) => ({
+      Type: r.category,
+      Description: r.description,
+      Owner: r.owner,
+      Impact: r.impact,
+      Probability: r.probability,
+      Status: r.status,
+      Mitigation: r.mitigation,
+      "Target date": r.targetDate,
+      Notes: r.notes,
     })),
-    "TPM-Task-Tracker",
-    "Tasks",
+    "TPM-RAID-Log",
+    "RAID",
     sectionMarkdown
   );
 }
 
-export function exportTaskTrackerDocument(
-  tasks: TaskRow[],
+export function exportRaidLogDocument(
+  raidLog: RaidLogRow[],
   sectionMarkdown?: string
 ): void {
   const docHtml =
-    tasks.length > 0
+    raidLog.length > 0
       ? rowsToHtmlTable(
-          ["#", "Description", "Owner", "Start", "End", "Dependency", "Status"],
-          tasks.map((t) => [
-            t.taskNumber || "",
-            t.description,
-            t.owner,
-            t.start,
-            t.end,
-            t.dependency,
-            t.status,
+          [
+            "Type",
+            "Description",
+            "Owner",
+            "Impact",
+            "Probability",
+            "Status",
+            "Mitigation",
+            "Target date",
+          ],
+          raidLog.map((r) => [
+            r.category,
+            r.description,
+            r.owner,
+            r.impact,
+            r.probability,
+            r.status,
+            r.mitigation,
+            r.targetDate,
           ])
         )
       : "";
   exportPanelDocument(
-    "TPM-Task-Tracker",
-    "Task Tracker — Work Items",
+    "TPM-RAID-Log",
+    "RAID Log — Risks, Assumptions, Issues, Dependencies",
     docHtml,
     sectionMarkdown
   );
@@ -302,11 +317,11 @@ export function canExportIssues(
   return issues.length > 0 || Boolean(sectionMarkdown?.trim());
 }
 
-export function canExportTasks(
-  tasks: TaskRow[],
+export function canExportRaidLog(
+  raidLog: RaidLogRow[],
   sectionMarkdown?: string
 ): boolean {
-  return tasks.length > 0 || Boolean(sectionMarkdown?.trim());
+  return raidLog.length > 0 || Boolean(sectionMarkdown?.trim());
 }
 
 export function canExportMinutes(minutes: MeetingMinutes): boolean {

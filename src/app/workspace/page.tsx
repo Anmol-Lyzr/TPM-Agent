@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { TranscriptPanel } from "@/components/input/TranscriptPanel";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
-import { SAMPLE_TRANSCRIPT } from "@/lib/sampleTranscript";
+import {
+  SAMPLE_BUG_TRANSCRIPT,
+  SAMPLE_TRANSCRIPT,
+} from "@/lib/sampleTranscript";
 import { postAgent } from "@/lib/agentClient";
 import { buildRefineMessage } from "@/lib/buildRefineMessage";
 import { AGENT_ID, emptyParsed } from "@/lib/constants";
+import { enrichParsedRaid } from "@/lib/raidLog";
 import { fetchSession, saveSession } from "@/lib/sessionStore";
 import {
   clearStoredSessionId,
@@ -38,7 +42,9 @@ export default function WorkspacePage() {
     fetchSession(stored)
       .then((saved) => {
         if (cancelled || !saved) return;
-        setParsed(saved.parsed);
+        setParsed(
+          enrichParsedRaid(saved.parsed, saved.transcript ?? undefined)
+        );
         if (saved.transcript) setTranscript(saved.transcript);
         if (saved.rawReply) setRawReply(saved.rawReply);
         setHasRun(true);
@@ -69,7 +75,10 @@ export default function WorkspacePage() {
 
   const applyAgentResponse = useCallback(
     async (data: AgentApiResponse) => {
-      const next = data.parsed ?? emptyParsed;
+      const next = enrichParsedRaid(
+        data.parsed ?? emptyParsed,
+        transcript.trim() || undefined
+      );
       setParsed(next);
       setRawReply(data.reply);
       setSessionId(data.session_id);
@@ -179,6 +188,10 @@ export default function WorkspacePage() {
     setTranscript(SAMPLE_TRANSCRIPT);
   }, []);
 
+  const handleLoadBugSample = useCallback(() => {
+    setTranscript(SAMPLE_BUG_TRANSCRIPT);
+  }, []);
+
   const showEmpty = !hasRun && !isLoading;
 
   return (
@@ -194,6 +207,7 @@ export default function WorkspacePage() {
           onAnalyze={handleAnalyze}
           onNewMeeting={handleNewMeeting}
           onLoadSample={handleLoadSample}
+          onLoadBugSample={handleLoadBugSample}
         />
       </aside>
 
@@ -204,7 +218,7 @@ export default function WorkspacePage() {
             <div>
               <h2 className="text-xl font-bold tracking-tight text-foreground">Workspace</h2>
               <p className="text-sm text-muted-foreground">
-                Analyze transcripts and manage project plan, issues, tasks, and minutes
+                Analyze transcripts and manage project plan, issues, RAID log, and minutes
               </p>
             </div>
           </header>

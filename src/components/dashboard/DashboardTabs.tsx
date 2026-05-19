@@ -3,19 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs } from "@/components/ui/tabs";
 import { EditToolbar } from "@/components/dashboard/EditToolbar";
+import { ParseWarningsBanner } from "@/components/dashboard/ParseWarningsBanner";
 import { RefinePromptBar } from "@/components/dashboard/RefinePromptBar";
 import { PanelExportActions } from "@/components/ui/PanelExportActions";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { ProjectPlanTable } from "@/components/panels/ProjectPlanTable";
 import { IssueTracker } from "@/components/panels/IssueTracker";
-import { TaskTracker } from "@/components/panels/TaskTracker";
+import { RaidLogPanel } from "@/components/panels/RaidLogPanel";
 import { MeetingMinutes } from "@/components/panels/MeetingMinutes";
 import {
   DASHBOARD_TABS,
   applyIssuesSave,
   applyMomSave,
   applyProjectPlanSave,
-  applyTasksSave,
+  applyRaidLogSave,
   cloneTabSnapshot,
   getTabSnapshot,
 } from "@/lib/dashboardState";
@@ -23,15 +24,15 @@ import {
   canExportIssues,
   canExportMinutes,
   canExportProjectPlan,
-  canExportTasks,
+  canExportRaidLog,
   exportIssueTrackerDocument,
   exportIssueTrackerExcel,
   exportMeetingMinutesDocument,
   exportMeetingMinutesExcel,
   exportProjectPlanDocument,
   exportProjectPlanExcel,
-  exportTaskTrackerDocument,
-  exportTaskTrackerExcel,
+  exportRaidLogDocument,
+  exportRaidLogExcel,
 } from "@/lib/panelExports";
 import type {
   DashboardTabId,
@@ -39,13 +40,13 @@ import type {
   MeetingMinutes as MoMType,
   ParsedAgentResponse,
   ProjectPlanRow,
-  TaskRow,
+  RaidLogRow,
 } from "@/types/tpm";
 
 type TabDraft =
   | { tab: "plan"; data: ProjectPlanRow[] }
   | { tab: "issues"; data: JiraIssueRow[] }
-  | { tab: "tasks"; data: TaskRow[] }
+  | { tab: "raid"; data: RaidLogRow[] }
   | { tab: "mom"; data: MoMType };
 
 function tabIsEmpty(parsed: ParsedAgentResponse, tab: DashboardTabId): boolean {
@@ -56,8 +57,8 @@ function tabIsEmpty(parsed: ParsedAgentResponse, tab: DashboardTabId): boolean {
       );
     case "issues":
       return parsed.issues.length === 0 && !parsed.sections.jira;
-    case "tasks":
-      return parsed.tasks.length === 0 && !parsed.sections.smartsheet;
+    case "raid":
+      return parsed.raidLog.length === 0 && !parsed.sections.raid?.trim();
     case "mom":
       return (
         !parsed.meetingMinutes.rawBody &&
@@ -128,10 +129,10 @@ export function DashboardTabs({
           data: cloneTabSnapshot(parsed.issues),
         });
         break;
-      case "tasks":
+      case "raid":
         setDraft({
-          tab: "tasks",
-          data: cloneTabSnapshot(parsed.tasks),
+          tab: "raid",
+          data: cloneTabSnapshot(parsed.raidLog),
         });
         break;
       case "mom":
@@ -159,8 +160,8 @@ export function DashboardTabs({
       case "issues":
         next = applyIssuesSave(parsed, draft.data);
         break;
-      case "tasks":
-        next = applyTasksSave(parsed, draft.data);
+      case "raid":
+        next = applyRaidLogSave(parsed, draft.data);
         break;
       case "mom":
         next = applyMomSave(parsed, draft.data);
@@ -230,18 +231,18 @@ export function DashboardTabs({
             }
           />
         );
-      case "tasks":
+      case "raid":
         return (
           <PanelExportActions
             disabled={
               disabled ||
-              !canExportTasks(parsed.tasks, parsed.sections.smartsheet)
+              !canExportRaidLog(parsed.raidLog, parsed.sections.raid)
             }
             onExportExcel={() =>
-              exportTaskTrackerExcel(parsed.tasks, parsed.sections.smartsheet)
+              exportRaidLogExcel(parsed.raidLog, parsed.sections.raid)
             }
             onExportDocument={() =>
-              exportTaskTrackerDocument(parsed.tasks, parsed.sections.smartsheet)
+              exportRaidLogDocument(parsed.raidLog, parsed.sections.raid)
             }
           />
         );
@@ -264,8 +265,8 @@ export function DashboardTabs({
     isEditing && draft?.tab === "plan" ? draft.data : parsed.projectPlan;
   const issues =
     isEditing && draft?.tab === "issues" ? draft.data : parsed.issues;
-  const tasks =
-    isEditing && draft?.tab === "tasks" ? draft.data : parsed.tasks;
+  const raidLog =
+    isEditing && draft?.tab === "raid" ? draft.data : parsed.raidLog;
   const minutes =
     isEditing && draft?.tab === "mom" ? draft.data : parsed.meetingMinutes;
 
@@ -291,6 +292,8 @@ export function DashboardTabs({
           {exportActions}
         </div>
       </div>
+
+      <ParseWarningsBanner meta={parsed.parseMeta} />
 
       {hasRun && !isLoading && !readOnly && onRefine ? (
         <RefinePromptBar
@@ -339,15 +342,15 @@ export function DashboardTabs({
             />
           ) : null}
 
-          {activeTab === "tasks" ? (
-            <TaskTracker
+          {activeTab === "raid" ? (
+            <RaidLogPanel
               embedded
-              tasks={tasks}
-              sectionMarkdown={parsed.sections.smartsheet}
-              isEditing={isEditing && draft?.tab === "tasks"}
+              raidLog={raidLog}
+              sectionMarkdown={parsed.sections.raid}
+              isEditing={isEditing && draft?.tab === "raid"}
               isEmpty={activeEmpty}
               onDraftChange={(data) => {
-                setDraft({ tab: "tasks", data });
+                setDraft({ tab: "raid", data });
                 setIsDirty(true);
               }}
             />

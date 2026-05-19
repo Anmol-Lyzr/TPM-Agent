@@ -1,7 +1,6 @@
 "use client";
 
 import { FileText, Loader2, Plus, Sparkles } from "lucide-react";
-import { SAMPLE_TRANSCRIPT } from "@/lib/sampleTranscript";
 import { cn } from "@/lib/cn";
 
 export function TranscriptPanel({
@@ -13,6 +12,7 @@ export function TranscriptPanel({
   onAnalyze,
   onNewMeeting,
   onLoadSample,
+  onLoadBugSample,
 }: {
   transcript: string;
   onTranscriptChange: (value: string) => void;
@@ -22,13 +22,14 @@ export function TranscriptPanel({
   onAnalyze: () => void;
   onNewMeeting: () => void;
   onLoadSample: () => void;
+  onLoadBugSample: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border/50 px-4 py-4">
         <h1 className="text-lg font-semibold text-foreground">TPM Agent</h1>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Paste an MS Teams transcript to generate plans, issues, and minutes.
+          Paste an MS Teams transcript to generate plans, issues, and minutes. Use Load sample for a Hunt Military Communities Resident Connect meeting template.
         </p>
       </div>
 
@@ -40,14 +41,26 @@ export function TranscriptPanel({
           >
             Meeting transcript
           </label>
-          <button
-            type="button"
-            onClick={onLoadSample}
-            disabled={isLoading}
-            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
-          >
-            Load sample
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onLoadSample}
+              disabled={isLoading}
+              className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+            >
+              Load sample (HMC)
+            </button>
+            <span className="text-muted-foreground/40">|</span>
+            <button
+              type="button"
+              onClick={onLoadBugSample}
+              disabled={isLoading}
+              className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+              title="Bug triage meeting — populates Jira Bug-type issues after Analyze"
+            >
+              Bug sample
+            </button>
+          </div>
         </div>
 
         <textarea
@@ -118,12 +131,10 @@ export function TranscriptPanel({
           <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             TPM Agent analyzes your transcript and populates the project plan,
-            issue tracker, tasks, and meeting minutes.
+            issue tracker, RAID log, and meeting minutes.
           </span>
         </div>
       </div>
     </div>
   );
 }
-
-export { SAMPLE_TRANSCRIPT };

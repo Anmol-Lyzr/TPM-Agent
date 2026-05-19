@@ -1,3 +1,5 @@
+import type { DashboardAnalytics } from "@/lib/analytics";
+import { coerceParsed } from "@/lib/coerceParsed";
 import type { ParsedAgentResponse } from "@/types/tpm";
 
 function toIso(value?: string | Date): string | undefined {
@@ -22,7 +24,22 @@ export interface SessionListItem {
   hasTranscript: boolean;
   planCount: number;
   issuesCount: number;
-  tasksCount: number;
+  raidCount: number;
+}
+
+export async function fetchDashboardAnalytics(): Promise<DashboardAnalytics> {
+  const res = await fetch("/api/analytics");
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `Failed to load analytics (${res.status})`);
+  }
+  const data = (await res.json()) as DashboardAnalytics;
+  return {
+    overallProjects: data.overallProjects ?? 0,
+    completedProjects: data.completedProjects ?? 0,
+    totalBugs: data.totalBugs ?? 0,
+    totalSessions: data.totalSessions ?? 0,
+  };
 }
 
 export async function fetchSessionList(): Promise<SessionListItem[]> {
@@ -34,6 +51,10 @@ export async function fetchSessionList(): Promise<SessionListItem[]> {
   const data = (await res.json()) as { sessions: SessionListItem[] };
   return (data.sessions ?? []).map((s) => ({
     ...s,
+    raidCount:
+      typeof s.raidCount === "number"
+        ? s.raidCount
+        : Number((s as { tasksCount?: number }).tasksCount) || 0,
     createdAt: toIso(s.createdAt as string | Date | undefined),
     updatedAt: toIso(s.updatedAt as string | Date | undefined),
   }));
@@ -60,7 +81,7 @@ export async function fetchSession(
     updatedAt?: string | Date;
   };
   return {
-    parsed: data.parsed,
+    parsed: coerceParsed(data.parsed),
     transcript: data.transcript,
     rawReply: data.rawReply,
     createdAt: toIso(data.createdAt),

@@ -1,11 +1,9 @@
 const LYZR_API_URL = "https://agent-prod.studio.lyzr.ai/v3/inference/chat/";
 
+import { formatAgentTextReply } from "@/lib/formatAgentText";
+
 export function extractReply(data: Record<string, unknown>): string {
-  if (typeof data.response === "string" && data.response) return data.response;
-  if (typeof data.message === "string" && data.message) return data.message;
-  if (typeof data.content === "string" && data.content) return data.content;
-  if (typeof data.reply === "string" && data.reply) return data.reply;
-  return JSON.stringify(data);
+  return formatAgentTextReply(data);
 }
 
 export function normalizeReply(reply: string): string {
@@ -49,7 +47,7 @@ export async function callAgent(
   }
 
   const data = (await upstreamRes.json()) as Record<string, unknown>;
-  const reply = normalizeReply(extractReply(data));
+  const reply = extractReply(data);
   const sessionId =
     (typeof data.session_id === "string" && data.session_id) ||
     params.sessionId;

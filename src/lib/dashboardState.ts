@@ -1,12 +1,12 @@
-import { projectPlanToTasks } from "@/lib/parseAgentResponse";
 import type {
   DashboardTabId,
   JiraIssueRow,
   MeetingMinutes,
   ParsedAgentResponse,
   ProjectPlanRow,
-  TaskRow,
+  RaidLogRow,
 } from "@/types/tpm";
+import { ensureRaidLogIds } from "@/lib/raidLog";
 
 export function cloneParsed(parsed: ParsedAgentResponse): ParsedAgentResponse {
   return JSON.parse(JSON.stringify(parsed)) as ParsedAgentResponse;
@@ -18,7 +18,6 @@ export function applyProjectPlanSave(
 ): ParsedAgentResponse {
   const next = cloneParsed(parsed);
   next.projectPlan = rows.map((r) => ({ ...r }));
-  next.tasks = projectPlanToTasks(next.projectPlan);
   return next;
 }
 
@@ -31,33 +30,13 @@ export function applyIssuesSave(
   return next;
 }
 
-export function applyTasksSave(
+/** RAID log saves are isolated — no sync to project plan or Jira. */
+export function applyRaidLogSave(
   parsed: ParsedAgentResponse,
-  tasks: TaskRow[]
+  raidLog: RaidLogRow[]
 ): ParsedAgentResponse {
   const next = cloneParsed(parsed);
-  next.tasks = tasks.map((t) => ({ ...t }));
-
-  next.projectPlan = next.projectPlan.map((row) => {
-    const num = row.taskNumber;
-    if (!num) return row;
-    const task = next.tasks.find((t) => t.taskNumber === num);
-    if (!task) return row;
-    const prefix = `${num} `;
-    return {
-      ...row,
-      taskDesc: task.description.startsWith(`${num} `)
-        ? task.description
-        : `${prefix}${task.description}`,
-      owner: task.owner,
-      start: task.start,
-      end: task.end,
-      dependency: task.dependency,
-      duration: row.duration,
-      comments: row.comments,
-    };
-  });
-
+  next.raidLog = ensureRaidLogIds(raidLog.map((r) => ({ ...r })));
   return next;
 }
 
@@ -86,8 +65,8 @@ export function getTabSnapshot(
       return parsed.projectPlan;
     case "issues":
       return parsed.issues;
-    case "tasks":
-      return parsed.tasks;
+    case "raid":
+      return parsed.raidLog;
     case "mom":
       return parsed.meetingMinutes;
   }
@@ -101,6 +80,6 @@ export function cloneTabSnapshot<T>(data: T): T {
 export const DASHBOARD_TABS: { key: DashboardTabId; label: string }[] = [
   { key: "plan", label: "Project Plan" },
   { key: "issues", label: "Issue Tracker" },
-  { key: "tasks", label: "Task Tracker" },
+  { key: "raid", label: "RAID Log" },
   { key: "mom", label: "Minutes of Meeting" },
 ];

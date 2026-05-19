@@ -15,7 +15,7 @@ export async function GET() {
         hasTranscript: s.hasTranscript,
         planCount: s.planCount,
         issuesCount: s.issuesCount,
-        tasksCount: s.tasksCount,
+        raidCount: s.raidCount,
       })),
     });
   } catch (err) {

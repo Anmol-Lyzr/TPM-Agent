@@ -3,6 +3,7 @@
 import * as React from "react"
 import {
   IconDashboard,
+  IconMessages,
   IconTerminal2,
   IconFolderOpen,
   IconSettings,
@@ -32,7 +33,8 @@ const data = {
   navMain: [
     { title: "Dashboard", url: "/", icon: IconDashboard },
     { title: "Workspace", url: "/workspace", icon: IconTerminal2 },
-    { title: "Session Viewer", url: "/session", icon: IconFolderOpen },
+    { title: "Agent Console", url: "/console", icon: IconMessages },
+    { title: "Projects", url: "/session", icon: IconFolderOpen },
   ],
   navSecondary: [
     { title: "Settings", url: "#", icon: IconSettings },

@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, FileText, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Calendar, FileText, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { SessionListItem } from "@/lib/sessionStore";
 
@@ -29,9 +29,11 @@ export function SessionListPanel({
   listLoading,
   listError,
   selectedSessionId,
+  editingSessionId,
   detailLoading,
   onSelect,
   onRefresh,
+  onEdit,
   onDelete,
   deletingSessionId,
 }: {
@@ -39,10 +41,12 @@ export function SessionListPanel({
   listLoading: boolean;
   listError: string | null;
   selectedSessionId: string | null;
+  editingSessionId: string | null;
   detailLoading: boolean;
   deletingSessionId: string | null;
   onSelect: (sessionId: string) => void;
   onRefresh: () => void;
+  onEdit: (sessionId: string) => void;
   onDelete: (sessionId: string, title: string) => void;
 }) {
   return (
@@ -97,6 +101,7 @@ export function SessionListPanel({
           <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             {sessions.map((session) => {
               const selected = session.sessionId === selectedSessionId;
+              const editing = session.sessionId === editingSessionId;
               const loadingThis = selected && detailLoading;
               const deleting = deletingSessionId === session.sessionId;
 
@@ -106,7 +111,9 @@ export function SessionListPanel({
                   className={cn(
                     "flex overflow-hidden rounded-xl border transition-colors",
                     selected
-                      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                      ? editing
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                        : "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
                       : "border-border/50 bg-card/60",
                     detailLoading && !selected && "opacity-50",
                     deleting && "opacity-60"
@@ -133,7 +140,7 @@ export function SessionListPanel({
                     <p className="mt-2 flex flex-wrap gap-1.5">
                       <StatPill label="Plan" value={session.planCount} />
                       <StatPill label="Issues" value={session.issuesCount} />
-                      <StatPill label="Tasks" value={session.tasksCount} />
+                      <StatPill label="RAID" value={session.raidCount} />
                       {session.hasTranscript ? (
                         <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
                           Transcript
@@ -143,6 +150,20 @@ export function SessionListPanel({
                     <p className="mt-2 truncate font-mono text-[10px] text-muted-foreground/60">
                       {session.sessionId}
                     </p>
+                  </button>
+                  <button
+                    type="button"
+                    title={editing ? "Editing this project" : "Edit project"}
+                    disabled={Boolean(deletingSessionId)}
+                    onClick={() => onEdit(session.sessionId)}
+                    className={cn(
+                      "flex w-10 shrink-0 items-center justify-center border-l border-border/50 disabled:cursor-not-allowed disabled:opacity-50",
+                      editing
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    )}
+                  >
+                    <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"

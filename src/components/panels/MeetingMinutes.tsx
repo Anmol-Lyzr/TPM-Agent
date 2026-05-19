@@ -16,6 +16,40 @@ import {
 const cellInput =
   "w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
 
+function hasStructuredContent(minutes: MoMType): boolean {
+  return Boolean(
+    minutes.summary ||
+      minutes.date ||
+      minutes.attendees.length ||
+      minutes.decisions.length ||
+      minutes.actionItems.length ||
+      minutes.risks.length ||
+      minutes.openQuestions.length
+  );
+}
+
+function MomSection({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="mb-4">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h4>
+      <ul className="list-disc space-y-1 pl-4 text-sm text-foreground">
+        {items.map((item, i) => (
+          <li key={`${title}-${i}`}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 type Props = {
   minutes: MoMType;
   isLoading?: boolean;
@@ -34,8 +68,9 @@ export function MeetingMinutes({
   onDraftChange,
 }: Props) {
   const canExport = canExportMinutes(minutes) && !isEmpty && !isLoading;
+  const structured = hasStructuredContent(minutes);
 
-  const content = isEmpty ? (
+  const body = isEmpty ? (
     <EmptyState
       icon={FileText}
       title="No meeting minutes yet"
@@ -66,27 +101,44 @@ export function MeetingMinutes({
           className={`${cellInput} min-h-[280px] font-mono`}
           placeholder="Meeting summary markdown…"
         />
-      ) : minutes.rawBody ? (
-        <MomMarkdown content={minutes.rawBody} />
-      ) : (
+      ) : structured ? (
         <>
           {minutes.title ? (
-            <h3 className="mb-3 text-base font-semibold text-foreground">
+            <h3 className="mb-1 text-base font-semibold text-foreground">
               {minutes.title}
             </h3>
           ) : null}
-          {minutes.summary ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {minutes.summary}
-            </p>
+          {minutes.date ? (
+            <p className="mb-3 text-sm text-muted-foreground">{minutes.date}</p>
           ) : null}
+          {minutes.summary ? (
+            <section className="mb-4">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Summary
+              </h4>
+              <p className="text-sm leading-relaxed text-foreground">
+                {minutes.summary}
+              </p>
+            </section>
+          ) : null}
+          <MomSection title="Attendees" items={minutes.attendees} />
+          <MomSection title="Decisions" items={minutes.decisions} />
+          <MomSection title="Action items" items={minutes.actionItems} />
+          <MomSection title="Risks / blockers" items={minutes.risks} />
+          <MomSection title="Open questions" items={minutes.openQuestions} />
         </>
-      )}
+      ) : minutes.rawBody ? (
+        <MomMarkdown content={minutes.rawBody} />
+      ) : minutes.title ? (
+        <h3 className="text-base font-semibold text-foreground">
+          {minutes.title}
+        </h3>
+      ) : null}
     </div>
   );
 
   if (embedded) {
-    return <div className="h-full overflow-hidden">{content}</div>;
+    return <div className="h-full overflow-hidden">{body}</div>;
   }
 
   return (
@@ -105,7 +157,7 @@ export function MeetingMinutes({
       />
       <div className="relative flex-1 overflow-hidden">
         {isLoading ? <LoadingOverlay /> : null}
-        {content}
+        {body}
       </div>
     </article>
   );

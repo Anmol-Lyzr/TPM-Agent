@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertSession } from "@/lib/db/sessions";
 import { callAgent, createSessionId } from "@/lib/lyzr";
-import { parseAgentResponse } from "@/lib/parseAgentResponse";
+import { parseAgentOutput } from "@/lib/agent/pipeline";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       (typeof body.session_id === "string" && body.session_id) ||
       createSessionId(agentId);
 
-    const { reply, sessionId: returnedSessionId } = await callAgent({
+    const { reply, sessionId: returnedSessionId, raw } = await callAgent({
       message,
       sessionId,
       apiKey,
@@ -57,18 +57,24 @@ export async function POST(req: NextRequest) {
       userId,
     });
 
-    const parsed = parseAgentResponse(reply);
+    const transcript =
+      mode === "analyze" && typeof body.transcript === "string"
+        ? body.transcript.trim()
+        : undefined;
+
+    const { parsed, reply: normalizedReply } = parseAgentOutput({
+      markdown: reply,
+      upstream: raw,
+      transcript,
+    });
 
     let persisted = false;
     let persistError: string | undefined;
     try {
       await upsertSession(returnedSessionId, {
         parsed,
-        rawReply: reply,
-        transcript:
-          mode === "analyze" && typeof body.transcript === "string"
-            ? body.transcript
-            : undefined,
+        rawReply: normalizedReply,
+        transcript: transcript || undefined,
       });
       persisted = true;
     } catch (dbErr) {
@@ -79,9 +85,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      reply,
+      reply: normalizedReply,
       session_id: returnedSessionId,
       parsed,
+      parse_meta: parsed.parseMeta,
       persisted,
       persist_error: persistError,
     });

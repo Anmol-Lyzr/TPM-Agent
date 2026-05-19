@@ -60,6 +60,7 @@ export function IssueTracker({
       <table className="w-full text-left text-xs">
         <thead>
           <tr className="border-b border-border/50 text-muted-foreground">
+            <th className="px-2 py-2 font-medium">Type</th>
             <th className="px-2 py-2 font-medium">Key</th>
             <th className="px-2 py-2 font-medium">Summary</th>
             <th className="px-2 py-2 font-medium">Status</th>
@@ -72,6 +73,28 @@ export function IssueTracker({
         <tbody>
           {issues.map((issue, idx) => (
             <tr key={`${issue.key}-${idx}`} className="border-b border-border/30 hover:bg-black/[0.02]">
+              <td className="px-2 py-2.5">
+                {isEditing ? (
+                  <input
+                    value={issue.issueType ?? ""}
+                    onChange={(e) =>
+                      updateIssue(idx, { issueType: e.target.value })
+                    }
+                    className={cellInput}
+                    placeholder="Bug, Task…"
+                  />
+                ) : issue.issueType ? (
+                  <Badge
+                    variant={
+                      /bug|defect/i.test(issue.issueType) ? "danger" : "default"
+                    }
+                  >
+                    {issue.issueType}
+                  </Badge>
+                ) : (
+                  "—"
+                )}
+              </td>
               <td className="px-2 py-2.5">
                 {isEditing ? (
                   <input
