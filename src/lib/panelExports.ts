@@ -3,7 +3,7 @@ import type {
   MeetingMinutes,
   ProjectPlanRow,
   RaidLogRow,
-} from "@/types/tpm";
+} from "@/types/legacyTpm";
 import {
   exportHtmlToWordDocument,
   exportRowsToExcel,

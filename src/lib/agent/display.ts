@@ -1,4 +1,27 @@
-import { asString, asStringArray } from "./normalize";
+function asString(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => asString(v)).filter(Boolean).join(", ");
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function asStringArray(value: unknown): string[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => asString(item).trim()).filter((s) => s.length > 0);
+  }
+  if (typeof value === "string") {
+    return value.split(/\n|;/).map((s) => s.replace(/^[-*•]\s+/, "").trim()).filter(Boolean);
+  }
+  return [];
+}
 
 /** Format any agent field for UI — never returns `[object Object]`. */
 export function formatDisplayValue(value: unknown): string {

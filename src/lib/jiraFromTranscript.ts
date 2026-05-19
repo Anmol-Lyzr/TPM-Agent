@@ -1,4 +1,4 @@
-import type { JiraIssueRow } from "@/types/tpm";
+import type { JiraIssueRow } from "@/types/legacyTpm";
 
 const JIRA_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/;
 

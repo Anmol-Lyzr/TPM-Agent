@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertSession } from "@/lib/db/sessions";
 import { callAgent, createSessionId } from "@/lib/lyzr";
-import { parseAgentOutput } from "@/lib/agent/pipeline";
+import { extractAgentPayload } from "@/lib/agent/pipeline";
+import { upsertSession } from "@/lib/db/sessions";
 
 export const runtime = "nodejs";
-// Full transcript + Lyzr tool calls often exceed 120s; Pro allows up to 300s.
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
@@ -12,45 +11,21 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.LYZR_API_KEY;
     const agentId = process.env.LYZR_AGENT_ID;
     const userId = process.env.LYZR_USER_ID;
-
     if (!apiKey || !agentId || !userId) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing LYZR_API_KEY, LYZR_AGENT_ID, or LYZR_USER_ID in environment",
-        },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
     }
 
     const body = await req.json();
     const message = typeof body.message === "string" ? body.message.trim() : "";
-    const mode =
-      body.mode === "refine" || body.mode === "analyze" ? body.mode : "analyze";
-
     if (!message) {
-      return NextResponse.json(
-        { error: "message is required" },
-        { status: 400 }
-      );
-    }
-
-    if (mode === "refine") {
-      const sid =
-        typeof body.session_id === "string" ? body.session_id.trim() : "";
-      if (!sid) {
-        return NextResponse.json(
-          { error: "session_id is required for refine mode" },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
     const sessionId =
       (typeof body.session_id === "string" && body.session_id) ||
       createSessionId(agentId);
 
-    const { reply, sessionId: returnedSessionId, raw } = await callAgent({
+    const { sessionId: returnedSessionId, raw } = await callAgent({
       message,
       sessionId,
       apiKey,
@@ -58,38 +33,23 @@ export async function POST(req: NextRequest) {
       userId,
     });
 
-    const transcript =
-      mode === "analyze" && typeof body.transcript === "string"
-        ? body.transcript.trim()
-        : undefined;
-
-    const { parsed, reply: normalizedReply } = parseAgentOutput({
-      markdown: reply,
-      upstream: raw,
-      transcript,
-    });
+    const payload = extractAgentPayload(raw);
 
     let persisted = false;
     let persistError: string | undefined;
     try {
       await upsertSession(returnedSessionId, {
-        parsed,
-        rawReply: normalizedReply,
-        transcript: transcript || undefined,
+        payload,
+        transcript: typeof body.transcript === "string" ? body.transcript.trim() || undefined : undefined,
       });
       persisted = true;
-    } catch (dbErr) {
-      const msg =
-        dbErr instanceof Error ? dbErr.message : "MongoDB persist failed";
-      persistError = msg;
-      console.error("Failed to persist session to MongoDB:", dbErr);
+    } catch (err) {
+      persistError = err instanceof Error ? err.message : "DB persist failed";
     }
 
     return NextResponse.json({
-      reply: normalizedReply,
       session_id: returnedSessionId,
-      parsed,
-      parse_meta: parsed.parseMeta,
+      payload,
       persisted,
       persist_error: persistError,
     });

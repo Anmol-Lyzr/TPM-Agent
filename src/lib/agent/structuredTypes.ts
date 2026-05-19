@@ -4,7 +4,7 @@ import type {
   MeetingMinutes,
   ProjectPlanRow,
   RaidLogRow,
-} from "@/types/tpm";
+} from "@/types/legacyTpm";
 
 export interface StructuredParseResult {
   issues: JiraIssueRow[];

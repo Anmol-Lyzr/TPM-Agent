@@ -6,7 +6,7 @@ import type {
   ParsedAgentResponse,
   ProjectPlanRow,
   RaidLogRow,
-} from "@/types/tpm";
+} from "@/types/legacyTpm";
 import { enrichProjectPlan, enrichProjectPlanRow } from "@/lib/projectPlan";
 import { ensureRaidLogIds, normalizeRaidRow } from "@/lib/raidLog";
 
@@ -124,7 +124,7 @@ export function normalizeProjectPlanRow(raw: unknown): ProjectPlanRow {
   const parsed = ProjectPlanRowSchema.safeParse({
     wbsId:
       asString(
-        obj.wbsId ?? obj.wbs ?? obj.milestone_id ?? obj.task_id
+        obj.wbsId ?? obj.wbs_id ?? obj.wbs ?? obj.milestone_id ?? obj.task_id
       ) || undefined,
     taskName: asString(obj.taskName ?? obj.name ?? obj.title) || undefined,
     taskDesc: asString(
@@ -220,18 +220,13 @@ export function normalizeMeetingMinutes(raw: unknown): MeetingMinutes {
     obj.meeting_metadata && typeof obj.meeting_metadata === "object"
       ? (obj.meeting_metadata as Record<string, unknown>)
       : null;
-  const productContext =
-    obj.product_context && typeof obj.product_context === "object"
-      ? (obj.product_context as Record<string, unknown>)
-      : null;
 
   const parsed = MeetingMinutesSchema.safeParse({
     title:
       asString(obj.title ?? meta?.meeting_title) || undefined,
     date: asString(obj.date ?? meta?.date) || undefined,
     attendees: asStringArray(obj.attendees),
-    summary:
-      asString(obj.summary ?? productContext?.description) || undefined,
+    summary: asString(obj.summary) || undefined,
     decisions: asStringArray(obj.decisions),
     actionItems: asStringArray(obj.actionItems ?? obj.action_items),
     risks: asStringArray(obj.risks),

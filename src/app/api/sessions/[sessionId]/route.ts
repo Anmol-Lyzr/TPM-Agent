@@ -4,20 +4,18 @@ import {
   getSession,
   upsertSession,
 } from "@/lib/db/sessions";
-import type { ParsedAgentResponse } from "@/types/tpm";
+import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
 
-export async function GET(req: NextRequest, context: RouteContext) {
+export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     if (!sessionId?.trim()) {
       return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
-
-    const includeRaw = req.nextUrl.searchParams.get("includeRaw") === "1";
 
     const doc = await getSession(sessionId.trim());
     if (!doc) {
@@ -26,9 +24,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json({
       sessionId: doc.sessionId,
-      parsed: doc.parsed,
+      payload: doc.payload,
       transcript: doc.transcript,
-      rawReply: includeRaw ? doc.rawReply : undefined,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });
@@ -46,27 +43,20 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
 
     const body = await req.json();
-    const parsed = body.parsed as ParsedAgentResponse | undefined;
-    if (!parsed || typeof parsed !== "object") {
-      return NextResponse.json({ error: "parsed is required" }, { status: 400 });
-    }
+    const payload = body.payload as MeetingMinutesPayload | null | undefined;
 
     const transcript =
       typeof body.transcript === "string" ? body.transcript : undefined;
-    const rawReply =
-      typeof body.rawReply === "string" ? body.rawReply : undefined;
 
     const doc = await upsertSession(sessionId.trim(), {
-      parsed,
+      payload: payload ?? null,
       transcript,
-      rawReply,
     });
 
     return NextResponse.json({
       sessionId: doc.sessionId,
-      parsed: doc.parsed,
+      payload: doc.payload,
       transcript: doc.transcript,
-      rawReply: doc.rawReply,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });

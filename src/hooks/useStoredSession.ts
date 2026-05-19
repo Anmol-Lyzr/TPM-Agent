@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { emptyParsed } from "@/lib/constants";
 import { fetchSession } from "@/lib/sessionStore";
 import { getStoredSessionId } from "@/lib/session";
-import type { ParsedAgentResponse } from "@/types/tpm";
+import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
-/** Load session id + persisted parsed output from MongoDB (client-only). */
+/** Load session id + persisted payload from MongoDB (client-only). */
 export function useStoredSession() {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [parsed, setParsed] = useState<ParsedAgentResponse>(emptyParsed);
+  const [payload, setPayload] = useState<MeetingMinutesPayload | null>(null);
   const [hasStoredOutput, setHasStoredOutput] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -25,8 +24,8 @@ export function useStoredSession() {
     fetchSession(sid)
       .then((saved) => {
         if (cancelled) return;
-        if (saved?.parsed) {
-          setParsed(saved.parsed);
+        if (saved?.payload) {
+          setPayload(saved.payload);
           setHasStoredOutput(true);
         }
       })
@@ -42,5 +41,5 @@ export function useStoredSession() {
     };
   }, []);
 
-  return { sessionId, parsed, hasStoredOutput, ready, setSessionId, setParsed };
+  return { sessionId, payload, hasStoredOutput, ready, setSessionId, setPayload };
 }

@@ -2,279 +2,222 @@
 
 import { useMemo } from "react";
 import { Calendar } from "lucide-react";
-import type { ProjectPlanRow } from "@/types/tpm";
+import type { ProjectPlanPayload, ProjectPlanMilestone, ProjectPlanTask } from "@/types/meetingPayload";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
-import { MomMarkdown } from "@/components/panels/MomMarkdown";
-import { PanelExportActions } from "@/components/ui/PanelExportActions";
-import { SafeDisplay } from "@/components/ui/SafeDisplay";
-import {
-  canExportProjectPlan,
-  exportProjectPlanDocument,
-  exportProjectPlanExcel,
-} from "@/lib/panelExports";
-import {
-  enrichProjectPlan,
-  enrichProjectPlanRow,
-  getPlanDuration,
-  getPlanTaskDescription,
-  getPlanTaskName,
-  getPlanWbsId,
-  isOverallProjectTimelineRow,
-  isProjectPlanMilestone,
-  PROJECT_PLAN_COLUMNS,
-} from "@/lib/projectPlan";
 import { cn } from "@/lib/cn";
 
-const cellInput =
-  "w-full min-w-0 rounded border border-border/50 bg-background/60 px-1.5 py-1 text-xs focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20";
-
 type Props = {
-  rows: ProjectPlanRow[];
-  sectionMarkdown?: string;
+  plan: ProjectPlanPayload | null;
   isLoading?: boolean;
   isEmpty: boolean;
   embedded?: boolean;
-  isEditing?: boolean;
-  onDraftChange?: (rows: ProjectPlanRow[]) => void;
 };
 
+interface MilestoneAggregates {
+  start: string;
+  end: string;
+  totalDuration: number;
+  status: string;
+}
+
+function computeMilestoneAggregates(milestone: ProjectPlanMilestone): MilestoneAggregates {
+  const tasks = milestone.tasks ?? [];
+  if (tasks.length === 0) {
+    return {
+      start: milestone.start_date,
+      end: milestone.end_date,
+      totalDuration: milestone.milestone_timeline_duration ?? 0,
+      status: milestone.status,
+    };
+  }
+
+  let minDate: Date | null = null;
+  let minLabel = milestone.start_date;
+  let maxDate: Date | null = null;
+  let maxLabel = milestone.end_date;
+  let totalDuration = 0;
+
+  for (const task of tasks) {
+    if (task.start_date) {
+      const d = new Date(task.start_date);
+      if (!isNaN(d.getTime()) && (!minDate || d < minDate)) {
+        minDate = d;
+        minLabel = task.start_date;
+      }
+    }
+    if (task.end_date) {
+      const d = new Date(task.end_date);
+      if (!isNaN(d.getTime()) && (!maxDate || d > maxDate)) {
+        maxDate = d;
+        maxLabel = task.end_date;
+      }
+    }
+    totalDuration += task.duration_days ?? 0;
+  }
+
+  const statuses = tasks.map(t => (t.status ?? "").toLowerCase());
+  let derivedStatus: string = milestone.status;
+  if (statuses.every(s => s === "done")) {
+    derivedStatus = "Completed";
+  } else if (statuses.some(s => s === "blocked")) {
+    derivedStatus = "Blocked";
+  } else if (statuses.some(s => s === "in progress")) {
+    derivedStatus = "In Progress";
+  } else if (statuses.every(s => s === "to do" || s === "")) {
+    derivedStatus = "Not Started";
+  }
+
+  return {
+    start: minLabel,
+    end: maxLabel,
+    totalDuration,
+    status: derivedStatus,
+  };
+}
+
+function statusBadgeVariant(status: string): "success" | "warning" | "danger" | "default" {
+  const s = status.toLowerCase();
+  if (s === "completed" || s === "done") return "success";
+  if (s === "in progress") return "warning";
+  if (s === "blocked") return "danger";
+  return "default";
+}
+
+function TaskRow({ task }: { task: ProjectPlanTask }) {
+  return (
+    <tr className="border-b border-border/20 hover:bg-black/[0.02]">
+      <td className="px-2 py-2 pl-8 align-top font-mono text-[11px] text-muted-foreground">
+        {task.task_id || "—"}
+      </td>
+      <td className="px-2 py-2 align-top text-foreground">
+        <span className="pl-1">{task.title || "—"}</span>
+      </td>
+      <td className="max-w-[200px] px-2 py-2 align-top text-muted-foreground text-xs">
+        {task.description || "—"}
+      </td>
+      <td className="px-2 py-2 align-top text-muted-foreground">{task.owner || "—"}</td>
+      <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{task.start_date || "—"}</td>
+      <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{task.end_date || "—"}</td>
+      <td className="px-2 py-2 align-top text-muted-foreground">{task.duration_days ?? "—"}</td>
+      <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">
+        {task.dependency_ids?.join(", ") || "—"}
+      </td>
+      <td className="px-2 py-2 align-top">
+        {task.status ? (
+          <Badge variant={statusBadgeVariant(task.status)}>{task.status}</Badge>
+        ) : (
+          "—"
+        )}
+      </td>
+      <td className="max-w-[160px] px-2 py-2 align-top text-muted-foreground">
+        {task.comments || "—"}
+      </td>
+    </tr>
+  );
+}
+
 export function ProjectPlanTable({
-  rows,
-  sectionMarkdown,
+  plan,
   isLoading = false,
   isEmpty,
   embedded = false,
-  isEditing = false,
-  onDraftChange,
 }: Props) {
-  const displayRows = useMemo(() => enrichProjectPlan(rows), [rows]);
-  const milestoneCount = displayRows.filter(isProjectPlanMilestone).length;
-  const taskCount = displayRows.length - milestoneCount;
+  const milestones = plan?.milestones ?? [];
 
-  const showMarkdown = rows.length === 0 && Boolean(sectionMarkdown);
-  const canExport =
-    canExportProjectPlan(rows, sectionMarkdown) && !isEmpty && !isLoading;
+  const aggregates = useMemo(() => {
+    const map = new Map<string, MilestoneAggregates>();
+    for (const m of milestones) {
+      map.set(m.milestone_id, computeMilestoneAggregates(m));
+    }
+    return map;
+  }, [milestones]);
 
-  const updateRow = (index: number, patch: Partial<ProjectPlanRow>) => {
-    if (!onDraftChange) return;
-    const next = enrichProjectPlan(
-      rows.map((r, i) =>
-        i === index ? enrichProjectPlanRow({ ...r, ...patch }) : r
-      )
-    );
-    onDraftChange(next);
-  };
+  const milestoneCount = milestones.length;
+  const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length ?? 0), 0);
 
-  const content = isEmpty ? (
+  const content = isEmpty || milestones.length === 0 ? (
     <EmptyState
       icon={Calendar}
       title="No project plan yet"
-      description="Run analysis on a transcript to generate the Smartsheet WBS schedule."
+      description="Run analysis on a transcript to generate the project plan."
     />
-  ) : showMarkdown && sectionMarkdown ? (
-    <div className="h-full overflow-auto p-3">
-      <MomMarkdown content={sectionMarkdown} />
-    </div>
   ) : (
     <div className="h-full overflow-auto p-2">
       {milestoneCount > 0 ? (
         <p className="mb-2 px-2 text-[11px] text-muted-foreground">
           {milestoneCount} milestone{milestoneCount === 1 ? "" : "s"}
-          {taskCount > 0
-            ? ` · ${taskCount} task${taskCount === 1 ? "" : "s"}`
-            : ""}
+          {taskCount > 0 ? ` · ${taskCount} task${taskCount === 1 ? "" : "s"}` : ""}
         </p>
       ) : null}
       <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
         <thead>
           <tr className="border-b border-border/60 bg-muted/40 text-muted-foreground">
-            {PROJECT_PLAN_COLUMNS.map((col) => (
-              <th
-                key={col}
-                className={cn(
-                  "whitespace-nowrap px-2 py-2 font-medium",
-                  col === "Task Name" || col === "Task Description"
-                    ? "min-w-[140px]"
-                    : "",
-                  col === "Comments / Notes" ? "min-w-[120px]" : ""
-                )}
-              >
-                {col}
-              </th>
-            ))}
+            <th className="whitespace-nowrap px-2 py-2 font-medium">ID</th>
+            <th className="whitespace-nowrap min-w-[140px] px-2 py-2 font-medium">Task Name</th>
+            <th className="whitespace-nowrap min-w-[140px] px-2 py-2 font-medium">Description</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">Owner</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">Start Date</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">End Date</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">Duration (Days)</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">Dependencies</th>
+            <th className="whitespace-nowrap px-2 py-2 font-medium">Status</th>
+            <th className="whitespace-nowrap min-w-[120px] px-2 py-2 font-medium">Comments</th>
           </tr>
         </thead>
         <tbody>
-          {displayRows.map((row, i) => {
-            const milestone = isProjectPlanMilestone(row);
-            const overall = isOverallProjectTimelineRow(row);
-            const wbsId = getPlanWbsId(row);
-            const taskName = getPlanTaskName(row);
-            const taskDescription = getPlanTaskDescription(row);
-            const duration = getPlanDuration(row);
-
+          {milestones.map(milestone => {
+            const agg = aggregates.get(milestone.milestone_id);
             return (
-              <tr
-                key={`${wbsId || i}-${taskName}`}
-                className={cn(
-                  "border-b border-border/30",
-                  overall
-                    ? "bg-amber-500/[0.08] font-semibold"
-                    : milestone
-                      ? "bg-primary/[0.06] font-medium"
-                      : "hover:bg-black/[0.02]"
-                )}
-              >
-                <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.wbsId ?? wbsId}
-                      onChange={(e) =>
-                        updateRow(i, { wbsId: e.target.value })
-                      }
-                      className={cn(cellInput, "font-mono")}
-                    />
-                  ) : (
-                    wbsId || "—"
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top text-foreground">
-                  {isEditing ? (
-                    <textarea
-                      value={row.taskName ?? taskName}
-                      onChange={(e) =>
-                        updateRow(i, {
-                          taskName: e.target.value,
-                          ...(milestone
-                            ? { milestoneTitle: e.target.value }
-                            : {}),
-                        })
-                      }
-                      rows={milestone ? 2 : 1}
-                      className={cellInput}
-                    />
-                  ) : (
-                    <span className={milestone ? "font-semibold" : ""}>
-                      {taskName}
+              <>
+                {/* Milestone header row */}
+                <tr
+                  key={`m-${milestone.milestone_id}`}
+                  className="border-b border-border/50 bg-slate-100/80 dark:bg-slate-800/50"
+                >
+                  <td className="px-2 py-2.5 align-middle font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {milestone.milestone_id || "—"}
+                  </td>
+                  <td className="px-2 py-2.5 align-middle">
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">
+                      {milestone.title || "—"}
                     </span>
-                  )}
-                </td>
-                <td className="max-w-[220px] px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <textarea
-                      value={row.taskDesc}
-                      onChange={(e) =>
-                        updateRow(i, { taskDesc: e.target.value })
-                      }
-                      rows={2}
-                      className={cellInput}
-                    />
-                  ) : (
-                    <SafeDisplay value={taskDescription} multiline />
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.owner}
-                      onChange={(e) => updateRow(i, { owner: e.target.value })}
-                      className={cellInput}
-                    />
-                  ) : (
-                    row.owner || "—"
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.start}
-                      onChange={(e) => updateRow(i, { start: e.target.value })}
-                      className={cellInput}
-                    />
-                  ) : (
-                    row.start || "—"
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.end}
-                      onChange={(e) => updateRow(i, { end: e.target.value })}
-                      className={cellInput}
-                    />
-                  ) : (
-                    row.end || "—"
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.duration}
-                      onChange={(e) =>
-                        updateRow(i, { duration: e.target.value })
-                      }
-                      className={cn(cellInput, "w-14")}
-                    />
-                  ) : (
-                    duration || "—"
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.dependency}
-                      onChange={(e) =>
-                        updateRow(i, { dependency: e.target.value })
-                      }
-                      className={cn(cellInput, "font-mono")}
-                    />
-                  ) : (
-                    row.dependency || "—"
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.status ?? ""}
-                      onChange={(e) =>
-                        updateRow(i, { status: e.target.value })
-                      }
-                      className={cellInput}
-                    />
-                  ) : (
-                    row.status || "—"
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <input
-                      value={row.priority ?? ""}
-                      onChange={(e) =>
-                        updateRow(i, { priority: e.target.value })
-                      }
-                      className={cellInput}
-                    />
-                  ) : (
-                    row.priority || "—"
-                  )}
-                </td>
-                <td className="max-w-[200px] px-2 py-2 align-top text-muted-foreground">
-                  {isEditing ? (
-                    <textarea
-                      value={row.comments}
-                      onChange={(e) =>
-                        updateRow(i, { comments: e.target.value })
-                      }
-                      rows={2}
-                      className={cellInput}
-                    />
-                  ) : (
-                    <SafeDisplay value={row.comments} multiline />
-                  )}
-                </td>
-              </tr>
+                  </td>
+                  <td className="max-w-[200px] px-2 py-2.5 align-middle text-muted-foreground">
+                    {/* milestones don't have a description field */}
+                    —
+                  </td>
+                  <td className="px-2 py-2.5 align-middle text-muted-foreground">
+                    {milestone.owner || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                    {agg?.start || milestone.start_date || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                    {agg?.end || milestone.end_date || "—"}
+                  </td>
+                  <td className="px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                    {agg ? (agg.totalDuration > 0 ? agg.totalDuration : "—") : (milestone.milestone_timeline_duration ?? "—")}
+                  </td>
+                  <td className="px-2 py-2.5 align-middle font-mono text-[11px] text-muted-foreground">
+                    {milestone.dependencies?.join(", ") || "—"}
+                  </td>
+                  <td className="px-2 py-2.5 align-middle">
+                    {agg?.status ? (
+                      <Badge variant={statusBadgeVariant(agg.status)}>{agg.status}</Badge>
+                    ) : milestone.status ? (
+                      <Badge variant={statusBadgeVariant(milestone.status)}>{milestone.status}</Badge>
+                    ) : "—"}
+                  </td>
+                  <td className="px-2 py-2.5 align-middle text-muted-foreground">—</td>
+                </tr>
+                {/* Task rows */}
+                {(milestone.tasks ?? []).map(task => (
+                  <TaskRow key={`t-${task.task_id}`} task={task} />
+                ))}
+              </>
             );
           })}
         </tbody>
@@ -283,7 +226,7 @@ export function ProjectPlanTable({
   );
 
   if (embedded) {
-    return <div className="h-full overflow-hidden">{content}</div>;
+    return <div className={cn("h-full overflow-hidden")}>{content}</div>;
   }
 
   return (
@@ -291,17 +234,8 @@ export function ProjectPlanTable({
       <PanelHeader
         icon={Calendar}
         title="Project Plan"
-        subtitle="Smartsheet WBS"
-        count={displayRows.length || undefined}
-        actions={
-          <PanelExportActions
-            disabled={!canExport}
-            onExportExcel={() => exportProjectPlanExcel(rows, sectionMarkdown)}
-            onExportDocument={() =>
-              exportProjectPlanDocument(rows, sectionMarkdown)
-            }
-          />
-        }
+        subtitle="Milestones & tasks"
+        count={taskCount || undefined}
       />
       <div className="relative flex-1 overflow-hidden">
         {isLoading ? <LoadingOverlay /> : null}

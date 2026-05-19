@@ -1,4 +1,4 @@
-import type { AgentParseMeta, ParsedAgentResponse } from "@/types/tpm";
+import type { AgentParseMeta, ParsedAgentResponse } from "@/types/legacyTpm";
 
 export interface ParseDiagnosticInput {
   sourceMarkdown: string;
@@ -47,7 +47,7 @@ export function buildParseDiagnostics(
     );
   }
 
-  if (parsed.issues.some((i) => !i.key || i.key.startsWith("NEW-"))) {
+  if (parsed.issues.some((issue: { key?: string }) => !issue.key || issue.key.startsWith("NEW-"))) {
     warnings.push(
       "Some Jira rows are missing a valid issue key (showing placeholder keys)."
     );

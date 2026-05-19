@@ -1,4 +1,3 @@
-import { parseApiResponse } from "@/lib/parseApiResponse";
 import type { AgentApiResponse } from "@/types/tpm";
 
 export async function postAgent(body: {
@@ -12,14 +11,9 @@ export async function postAgent(body: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-
-  const data = await parseApiResponse<AgentApiResponse & { error?: string }>(
-    res
-  );
-
+  const data = await res.json() as AgentApiResponse & { error?: string };
   if (!res.ok) {
     throw new Error(data.error ?? `Request failed (${res.status})`);
   }
-
   return data;
 }

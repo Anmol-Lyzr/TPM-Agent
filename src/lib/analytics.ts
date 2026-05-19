@@ -1,4 +1,4 @@
-import type { JiraIssueRow, ParsedAgentResponse } from "@/types/tpm";
+import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
 export interface DashboardAnalytics {
   overallProjects: number;
@@ -8,57 +8,38 @@ export interface DashboardAnalytics {
 }
 
 export type SessionAnalyticsInput = {
-  parsed?: ParsedAgentResponse;
+  payload?: MeetingMinutesPayload | null;
 };
 
-export function sessionHasOutput(parsed?: ParsedAgentResponse): boolean {
-  if (!parsed) return false;
+export function sessionHasOutput(payload?: MeetingMinutesPayload | null): boolean {
+  if (!payload) return false;
   return (
-    (parsed.projectPlan?.length ?? 0) > 0 ||
-    (parsed.issues?.length ?? 0) > 0 ||
-    (parsed.raidLog?.length ?? 0) > 0 ||
-    Boolean(parsed.meetingMinutes?.rawBody?.trim()) ||
-    Boolean(parsed.meetingMinutes?.title?.trim())
+    (payload.project_plan?.milestones?.length ?? 0) > 0 ||
+    (payload.issue_tracker?.length ?? 0) > 0 ||
+    (payload.raid_log?.risks?.length ?? 0) > 0 ||
+    Boolean(payload.minutes_of_meeting?.purpose?.trim())
   );
 }
 
-export function isBugIssue(issue: JiraIssueRow): boolean {
-  const type = issue.issueType?.trim();
-  if (type) return /bug|defect/i.test(type);
-  return /\b(bug|defect|regression)\b/i.test(issue.summary);
+export function isBugIssue(issueType: string): boolean {
+  return /bug|defect/i.test(issueType);
 }
 
-/** Issue Tracker shows bugs/defects only — not Jira Task/Story rows or misrouted plan rows. */
-export function filterTrackerIssues(issues: JiraIssueRow[]): JiraIssueRow[] {
-  return issues.filter((issue) => {
-    if (issue.key.startsWith("NEW-")) return false;
-    const type = issue.issueType?.trim();
-    if (type && !/bug|defect/i.test(type)) return false;
-    return isBugIssue(issue);
-  });
-}
-
-export function countDistinctBugKeys(
-  sessions: SessionAnalyticsInput[]
-): number {
+export function countDistinctBugKeys(sessions: SessionAnalyticsInput[]): number {
   const bugKeys = new Set<string>();
-  for (const { parsed } of sessions) {
-    for (const issue of parsed?.issues ?? []) {
-      if (isBugIssue(issue) && issue.key) {
-        bugKeys.add(issue.key);
+  for (const { payload } of sessions) {
+    for (const issue of payload?.issue_tracker ?? []) {
+      if (isBugIssue(issue.issue_type) && issue.issue_key) {
+        bugKeys.add(issue.issue_key);
       }
     }
   }
   return bugKeys.size;
 }
 
-export function computeDashboardAnalytics(
-  sessions: SessionAnalyticsInput[]
-): DashboardAnalytics {
+export function computeDashboardAnalytics(sessions: SessionAnalyticsInput[]): DashboardAnalytics {
   const totalSessions = sessions.length;
-  const sessionsWithOutput = sessions.filter((s) =>
-    sessionHasOutput(s.parsed)
-  ).length;
+  const sessionsWithOutput = sessions.filter(s => sessionHasOutput(s.payload)).length;
 
   return {
     overallProjects: sessionsWithOutput,

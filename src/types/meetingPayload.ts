@@ -1,4 +1,6 @@
-/** Agent structured output — Meeting Minutes and Project Tracking Schema. */
+/** Agent structured output — Meeting Minutes and Project Tracking Schema (output.json). */
+
+// ── metadata ─────────────────────────────────────────────────────────────────
 
 export interface MeetingPilotInstallation {
   name: string;
@@ -16,73 +18,59 @@ export interface MeetingMetadata {
   platform: string;
 }
 
-export interface MeetingAttendee {
-  name: string;
-  initials: string;
-  role: string;
-  organization: string;
-}
+// ── minutes_of_meeting ──────────────────────────────────────────────────────
 
-export interface ProductContext {
-  product_name: string;
-  description: string;
-  core_capabilities: string[];
-  value_propositions: string[];
-}
-
-export interface DiscussionTopicDetails {
-  key_points: string[];
-  risks: string[];
-  decisions: string[];
-  dependencies: string[];
-}
-
-export interface DiscussionTopic {
-  topic_id: string;
-  title: string;
-  summary: string;
-  details: DiscussionTopicDetails;
-}
-
-export interface MeetingDecision {
+export interface MomKeyDecision {
   decision_id: string;
   decision: string;
-  made_by: string[];
-  priority: "Low" | "Medium" | "High" | "Critical";
-  related_modules: string[];
+  decided_by: string;
 }
 
-export interface MeetingActionItem {
+export interface MomActionItem {
   action_id: string;
-  title: string;
-  description: string;
-  owner: string[];
-  sprint: string;
-  status: "To Do" | "In Progress" | "Done" | "Blocked";
-  priority: "Low" | "Medium" | "High" | "Critical";
+  action: string;
+  owner: string;
   due_date: string;
-  target_outcome: string;
-  dependencies: string[];
+  status: "Open" | "In Progress" | "Done" | "Blocked";
 }
 
-export interface SprintPriorityItem {
-  rank: number;
-  item: string;
-  type: "Bug" | "Story" | "Task" | "Milestone";
+export interface DiscussionHighlight {
+  topic: string;
+  summary: string;
+  related_issue_keys: string[];
 }
 
-export interface SprintPriorities {
-  sprint: string;
-  priorities: SprintPriorityItem[];
+export interface NextMilestone {
+  milestone: string;
+  target_date: string;
 }
 
-export interface JiraIssuePayload {
+export interface MinutesOfMeeting {
+  purpose: string;
+  key_decisions: MomKeyDecision[];
+  action_items: MomActionItem[];
+  discussion_highlights: DiscussionHighlight[];
+  /** High-level risk/dependency strings surfaced during the meeting. */
+  risks_and_dependencies_summary: string[];
+  next_milestones: NextMilestone[];
+}
+
+// ── issue_tracker ─────────────────────────────────────────────────────────────
+
+export interface IssueTrackerEntry {
   issue_key: string;
   issue_type: "Bug" | "Story" | "Task" | "Epic";
   summary: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Critical";
-  status: "Open" | "To Do" | "In Progress" | "Done" | "Blocked";
+  status:
+    | "Open"
+    | "To Do"
+    | "In Progress"
+    | "Done"
+    | "Blocked"
+    | "Resolved"
+    | "Closed";
   assignee: string;
   reporter: string;
   sprint: string;
@@ -92,10 +80,21 @@ export interface JiraIssuePayload {
   blocked_by: string[];
   due_date: string;
   acceptance_criteria: string[];
+  severity: "Low" | "Medium" | "High" | "Critical";
+  module: string;
+  root_cause: string;
+  steps_to_reproduce: string[];
+  impact: string;
+  workaround: string;
+  resolution_plan: string;
+  date_opened: string;
+  date_resolved: string | null;
 }
 
+// ── project_plan ─────────────────────────────────────────────────────────────
+
 export interface ProjectPlanTask {
-  task_id: string;
+  task_id: string; // WBS: "1.1", "1.1.1", "1.1.2"
   title: string;
   description: string;
   start_date: string;
@@ -108,7 +107,8 @@ export interface ProjectPlanTask {
 }
 
 export interface ProjectPlanMilestone {
-  milestone_id: string;
+  milestone_id: string; // WBS: "1", "2", "3"
+  milestone_timeline_duration: number;
   title: string;
   start_date: string;
   end_date: string;
@@ -119,6 +119,7 @@ export interface ProjectPlanMilestone {
 }
 
 export interface ProjectPlanPayload {
+  project_timeline_duration: number;
   assumptions: {
     sprint_duration_weeks: number;
     target_ga_date: string;
@@ -126,23 +127,7 @@ export interface ProjectPlanPayload {
   milestones: ProjectPlanMilestone[];
 }
 
-export interface BugTrackerEntry {
-  bug_id: string;
-  summary: string;
-  severity: "Low" | "Medium" | "High" | "Critical";
-  priority: "P1" | "P2" | "P3" | "P4";
-  status: "Open" | "In Progress" | "Resolved" | "Closed";
-  reporter: string;
-  assignee: string;
-  module: string;
-  root_cause: string;
-  steps_to_reproduce: string[];
-  impact: string;
-  workaround: string;
-  resolution_plan: string;
-  date_opened: string;
-  date_resolved: string | null;
-}
+// ── raid_log ─────────────────────────────────────────────────────────────────
 
 export interface RaidRisk {
   risk_id: string;
@@ -202,24 +187,12 @@ export interface RaidLogPayload {
   dependencies: RaidDependency[];
 }
 
-export interface DocumentMetadata {
-  generated_at: string;
-  generated_by: string;
-  source: "Meeting Transcript" | "MS Teams" | "Manual Notes";
-  document_version: string;
-}
+// ── top-level payload ────────────────────────────────────────────────────────
 
 export interface MeetingMinutesPayload {
-  meeting_metadata: MeetingMetadata;
-  attendees: MeetingAttendee[];
-  product_context: ProductContext;
-  discussion_topics: DiscussionTopic[];
-  decisions: MeetingDecision[];
-  action_items: MeetingActionItem[];
-  sprint_priorities: SprintPriorities[];
-  jira_issues: JiraIssuePayload[];
+  metadata: MeetingMetadata;
+  minutes_of_meeting: MinutesOfMeeting;
+  issue_tracker: IssueTrackerEntry[];
   project_plan: ProjectPlanPayload;
-  bug_tracker: BugTrackerEntry[];
   raid_log: RaidLogPayload;
-  metadata: DocumentMetadata;
 }

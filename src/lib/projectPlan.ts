@@ -1,5 +1,4 @@
-import type { JiraIssueRow, ProjectPlanRow } from "@/types/tpm";
-import { isBugIssue } from "@/lib/analytics";
+import type { JiraIssueRow, ProjectPlanRow } from "@/types/legacyTpm";
 
 /** Smartsheet WBS column headers (CCB onboarding template). */
 export const PROJECT_PLAN_COLUMNS = [
@@ -586,7 +585,7 @@ export function filterBugsFromProjectPlan(
 ): ProjectPlanRow[] {
   const bugKeys = new Set<string>();
   for (const issue of issues ?? []) {
-    if (isBugIssue(issue) || /bug|defect/i.test(issue.summary)) {
+    if ((issue.issueType && /bug|defect/i.test(issue.issueType)) || /bug|defect/i.test(issue.summary)) {
       bugKeys.add(issue.key);
     }
   }

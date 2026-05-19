@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
       meetingContext = buildMeetingContextBlock({
         sessionId: doc.sessionId,
         transcript: doc.transcript,
-        parsed: doc.parsed,
-        title: doc.parsed.meetingMinutes?.title,
+        payload: doc.payload,
+        title: doc.payload?.metadata?.meeting_title,
       });
     }
 

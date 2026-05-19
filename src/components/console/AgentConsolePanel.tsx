@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   Bot,
   Loader2,
@@ -83,13 +81,19 @@ export function AgentConsolePanel() {
       .then((data) => {
         if (cancelled || !data) return;
         const title =
-          data.parsed.meetingMinutes?.title?.trim() ||
+          data.payload?.metadata?.meeting_title?.trim() ||
           sessions.find((s) => s.sessionId === meetingSessionId)?.title ||
           "Selected meeting";
         setMeetingTitle(title);
-        setMeetingStats(
-          `${data.parsed.projectPlan.length} plan · ${data.parsed.issues.length} issues · ${data.parsed.raidLog.length} RAID`
-        );
+        const issuesCount = data.payload?.issue_tracker?.length ?? 0;
+        const milestones = data.payload?.project_plan?.milestones ?? [];
+        const planCount = milestones.reduce((n, m) => n + m.tasks.length, 0);
+        const raidCount =
+          (data.payload?.raid_log?.risks?.length ?? 0) +
+          (data.payload?.raid_log?.assumptions?.length ?? 0) +
+          (data.payload?.raid_log?.issues?.length ?? 0) +
+          (data.payload?.raid_log?.dependencies?.length ?? 0);
+        setMeetingStats(`${planCount} plan · ${issuesCount} issues · ${raidCount} RAID`);
       })
       .catch(() => {
         if (!cancelled) setMeetingStats(null);
@@ -362,13 +366,7 @@ function ChatBubble({ role, content }: { role: ChatRole; content: string }) {
             : "glass-card rounded-xl px-5 py-4"
         )}
       >
-        {isUser ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
-        ) : (
-          <div className="prose-agent">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-          </div>
-        )}
+        <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
       </div>
     </div>
   );
