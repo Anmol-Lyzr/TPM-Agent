@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,27 +14,12 @@ import {
   Square,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { CONSOLE_AGENT_ID } from "@/lib/constants";
-import { postConsoleChat } from "@/lib/consoleClient";
-import {
-  clearStoredConsoleSessionId,
-  generateSessionId,
-  getStoredConsoleSessionId,
-  setStoredConsoleSessionId,
-} from "@/lib/session";
+import { useConsoleChat, type ChatRole } from "@/hooks/useConsoleChat";
 import {
   fetchSession,
   fetchSessionList,
   type SessionListItem,
 } from "@/lib/sessionStore";
-
-type ChatRole = "user" | "assistant";
-
-interface ChatMessage {
-  id: string;
-  role: ChatRole;
-  content: string;
-}
 
 const SUGGESTED_PROMPTS = [
   "What were the key decisions from this meeting?",
@@ -43,29 +28,26 @@ const SUGGESTED_PROMPTS = [
   "List action items with owners and due dates.",
 ];
 
-function newMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export function AgentConsolePanel() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [meetingSessionId, setMeetingSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [meetingTitle, setMeetingTitle] = useState<string | null>(null);
   const [meetingStats, setMeetingStats] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const stored = getStoredConsoleSessionId();
-    if (stored) setChatSessionId(stored);
-  }, []);
+  const {
+    messages,
+    input,
+    setInput,
+    sendMessage,
+    isLoading,
+    error,
+    chatSessionId,
+    handleNewChat,
+    handleStop,
+  } = useConsoleChat(meetingSessionId);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,68 +107,9 @@ export function AgentConsolePanel() {
     });
   }, [messages, isLoading]);
 
-  const sendMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || isLoading) return;
-
-      setError(null);
-      setInput("");
-      setMessages((prev) => [
-        ...prev,
-        { id: newMessageId(), role: "user", content: trimmed },
-      ]);
-      setIsLoading(true);
-
-      const sid =
-        chatSessionId ??
-        getStoredConsoleSessionId() ??
-        generateSessionId(CONSOLE_AGENT_ID);
-
-      abortRef.current = new AbortController();
-
-      try {
-        const data = await postConsoleChat({
-          message: trimmed,
-          session_id: sid,
-          meeting_session_id: meetingSessionId ?? undefined,
-        });
-
-        setChatSessionId(data.session_id);
-        setStoredConsoleSessionId(data.session_id);
-        setMessages((prev) => [
-          ...prev,
-          { id: newMessageId(), role: "assistant", content: data.reply },
-        ]);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Failed to get a reply");
-      } finally {
-        setIsLoading(false);
-        abortRef.current = null;
-      }
-    },
-    [chatSessionId, isLoading, meetingSessionId]
-  );
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void sendMessage(input);
-  };
-
-  const handleNewChat = () => {
-    abortRef.current?.abort();
-    clearStoredConsoleSessionId();
-    setChatSessionId(null);
-    setMessages([]);
-    setError(null);
-    setInput("");
-    setIsLoading(false);
-  };
-
-  const handleStop = () => {
-    abortRef.current?.abort();
-    setIsLoading(false);
   };
 
   return (

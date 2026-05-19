@@ -12,7 +12,6 @@ export function TranscriptPanel({
   onAnalyze,
   onNewMeeting,
   onLoadSample,
-  onLoadBugSample,
 }: {
   transcript: string;
   onTranscriptChange: (value: string) => void;
@@ -22,7 +21,6 @@ export function TranscriptPanel({
   onAnalyze: () => void;
   onNewMeeting: () => void;
   onLoadSample: () => void;
-  onLoadBugSample: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -49,16 +47,6 @@ export function TranscriptPanel({
               className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
             >
               Load sample (HMC)
-            </button>
-            <span className="text-muted-foreground/40">|</span>
-            <button
-              type="button"
-              onClick={onLoadBugSample}
-              disabled={isLoading}
-              className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
-              title="Bug triage meeting — populates Jira Bug-type issues after Analyze"
-            >
-              Bug sample
             </button>
           </div>
         </div>

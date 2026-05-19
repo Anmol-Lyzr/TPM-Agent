@@ -1,0 +1,82 @@
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.json({
+    provider: "composio",
+    authModel: "oauth-per-user",
+    composioConfigured: false,
+    description: "Manage your agent integrations via Composio MCP",
+    integrations: [
+      {
+        name: "perplexity",
+        status: "requires_setup",
+        description: "Real-time web search for competitive research and market intelligence.",
+        category: "research",
+        authType: "api_key",
+        actions: ["PERPLEXITY_SEARCH"],
+        useInSkills: ["competitive-benchmarker", "synthesis-recommender"],
+      },
+      {
+        name: "gmail",
+        status: "requires_setup",
+        description: "Send surveys, reports, and notifications to HR teams and client stakeholders.",
+        category: "communication",
+        authType: "oauth2",
+        oauthScopes: ["gmail.send"],
+        actions: ["GMAIL_SEND_EMAIL", "GMAIL_LIST_THREADS"],
+        useInSkills: ["survey-designer", "synthesis-recommender"],
+      },
+      {
+        name: "google-sheets",
+        status: "requires_setup",
+        description: "Import survey response data and export scenario analysis spreadsheets.",
+        category: "data",
+        authType: "oauth2",
+        actions: ["GOOGLESHEETS_GET_SHEET_DATA", "GOOGLESHEETS_CREATE_SPREADSHEET"],
+        useInSkills: ["survey-designer", "synthesis-recommender"],
+      },
+      {
+        name: "google-drive",
+        status: "requires_setup",
+        description: "Pull client policy documents and benefit plan documents for analysis.",
+        category: "data",
+        authType: "oauth2",
+        actions: ["GOOGLEDRIVE_LIST_FILES", "GOOGLEDRIVE_GET_FILE"],
+        useInSkills: ["policy-analyzer"],
+      },
+      {
+        name: "notion",
+        status: "available",
+        description: "Sync policy assessments and recommendation reports to client workspaces.",
+        category: "knowledge",
+        authType: "oauth2",
+        actions: ["NOTION_CREATE_PAGE", "NOTION_UPDATE_PAGE"],
+        useInSkills: ["policy-analyzer"],
+      },
+      {
+        name: "slack",
+        status: "available",
+        description: "Send alerts and report summaries to HR and finance team channels.",
+        category: "communication",
+        authType: "oauth2",
+        actions: ["SLACK_SEND_MESSAGE"],
+      },
+      {
+        name: "github",
+        status: "available",
+        description: "Version-control agent definitions, skills, and knowledge base updates.",
+        category: "development",
+        authType: "oauth2",
+        actions: ["GITHUB_CREATE_FILE", "GITHUB_GET_REPO"],
+      },
+      {
+        name: "linear",
+        status: "available",
+        description: "Track engagement milestones and action items as Linear issues.",
+        category: "project-management",
+        authType: "oauth2",
+        actions: ["LINEAR_CREATE_ISSUE", "LINEAR_LIST_ISSUES"],
+      },
+    ],
+  });
+}

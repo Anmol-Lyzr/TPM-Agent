@@ -1,168 +1,132 @@
 "use client";
 
-import { type ComponentType } from "react";
-import Link from "next/link";
-import {
-  ArrowRight,
-  Bug,
-  CheckCircle2,
-  FolderKanban,
-  ListTodo,
-  Sparkles,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useDashboardAnalytics } from "@/hooks/useDashboardAnalytics";
+import Logo from "@/components/logo/Logo";
+import { DashboardSearchBar, type DashboardSuggestedAction } from "@/components/dashboard/DashboardSearchBar";
+import { DashboardChatThread } from "@/components/dashboard/DashboardChatThread";
+import { DashboardStatsSection } from "@/components/dashboard/DashboardStatsSection";
+import { useConsoleChat } from "@/hooks/useConsoleChat";
+import { fetchSessionList, type SessionListItem } from "@/lib/sessionStore";
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
+const DEFAULT_SUGGESTED: DashboardSuggestedAction[] = [
+  {
+    label: "Summarize open RAID items across projects",
+    detail: "Owners, severity, and status from stored meeting outputs",
+    prompt: "Summarize all open RAID log items with owners and recommended next steps.",
+  },
+  {
+    label: "Review blocked or open Jira issues",
+    detail: "Issues synced from meeting analysis",
+    prompt: "Which Jira issues are blocked or still open, and who owns them?",
+  },
+  {
+    label: "Highlight project plan gaps",
+    detail: "Compare plan tasks to decisions and action items",
+    prompt: "Highlight gaps or risks in the project plan based on recent meeting outputs.",
+  },
+  {
+    label: "Draft meeting follow-up email",
+    detail: "Decisions, action items, and owners",
+    prompt: "Draft a concise follow-up email with key decisions and action items from the latest meeting.",
+  },
+  {
+    label: "List overdue action items",
+    detail: "From minutes and RAID across sessions",
+    prompt: "List action items that appear overdue or missing owners across stored sessions.",
+  },
+];
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
-};
-
-function StatCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-}: {
-  label: string;
-  value: string | number;
-  hint: string;
-  icon: ComponentType<{ className?: string }>;
-}) {
-  return (
-    <motion.div variants={itemVariants} className="glass-card rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="p-1.5 rounded-lg bg-primary/10">
-          <Icon className="w-3.5 h-3.5 text-primary" />
-        </div>
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      </div>
-      <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>
-    </motion.div>
-  );
+function buildSuggestedFromSessions(sessions: SessionListItem[]): DashboardSuggestedAction[] {
+  return sessions.slice(0, 5).map((s) => ({
+    label: `Ask about “${s.title.length > 42 ? `${s.title.slice(0, 42)}…` : s.title}”`,
+    detail: `${s.planCount} plan · ${s.issuesCount} issues · ${s.raidCount} RAID`,
+    prompt: `For the meeting "${s.title}": summarize key decisions, open RAID items, and blocked Jira issues.`,
+  }));
 }
 
 export function DashboardHome() {
-  const { analytics, ready, error } = useDashboardAnalytics();
+  const [query, setQuery] = useState("");
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
 
-  const display = (n: number) => (ready ? n : "—");
+  const {
+    messages,
+    input,
+    setInput,
+    sendMessage,
+    isLoading,
+    error,
+    handleNewChat,
+  } = useConsoleChat(null);
+
+  useEffect(() => {
+    fetchSessionList()
+      .then(setSessions)
+      .catch(() => setSessions([]));
+  }, []);
+
+  const suggestedActions = useMemo(
+    () =>
+      sessions.length > 0 ? buildSuggestedFromSessions(sessions) : DEFAULT_SUGGESTED,
+    [sessions]
+  );
+
+  const handleSubmit = useCallback(() => {
+    const text = (query || input).trim();
+    if (!text) return;
+    setQuery("");
+    void sendMessage(text);
+  }, [query, input, sendMessage]);
+
+  const handleSuggestedPrompt = useCallback(
+    (prompt: string) => {
+      setQuery(prompt);
+      setInput(prompt);
+      void sendMessage(prompt);
+    },
+    [sendMessage, setInput]
+  );
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto w-full">
-      {/* Page header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-1">
-          <Sparkles className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+    <div className="px-4 py-5 sm:px-6 max-w-[1050px] mx-auto space-y-10">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center text-center pt-4 pb-2"
+      >
+        <div className="mb-4 flex items-center gap-2.5">
+          <Logo size={36} />
+          <span className="text-2xl font-semibold text-foreground">TPM Agent</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Combined analytics across all meeting sessions — plans, issues, RAID log, and minutes.
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+          Welcome, <span className="text-primary">TPM Lead</span>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2 max-w-lg">
+          Meeting intelligence for technical program managers — plans, RAID logs, Jira issues, and
+          minutes from your transcripts
         </p>
-      </div>
 
-      {error ? (
-        <p className="mb-4 text-sm text-destructive">{error}</p>
-      ) : null}
+        <DashboardSearchBar
+          query={query || input}
+          onChange={(val) => {
+            setQuery(val);
+            setInput(val);
+          }}
+          onSubmit={handleSubmit}
+          suggestedActions={suggestedActions}
+          onSuggestedPrompt={handleSuggestedPrompt}
+          isLoading={isLoading}
+        />
 
-      {/* Stat cards */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6"
-      >
-        <StatCard
-          label="Overall projects"
-          value={display(analytics.overallProjects)}
-          hint="Meetings with analyzed output"
-          icon={FolderKanban}
-        />
-        <StatCard
-          label="Total bugs"
-          value={display(analytics.totalBugs)}
-          hint="Bug-type Jira issues (deduped by key)"
-          icon={Bug}
-        />
-        <StatCard
-          label="Completed projects"
-          value={display(analytics.completedProjects)}
-          hint="Sessions with plan, issues, RAID log, or MoM"
-          icon={CheckCircle2}
+        <DashboardChatThread
+          messages={messages}
+          isLoading={isLoading}
+          error={error}
+          onNewChat={handleNewChat}
         />
       </motion.div>
 
-      {/* Across all sessions + Quick start */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 lg:grid-cols-3"
-      >
-        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden lg:col-span-2">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Across all sessions</h2>
-          </div>
-          <div className="p-5">
-            <p className="text-sm text-muted-foreground mb-4">
-              {ready ? (
-                <>
-                  {analytics.totalSessions === 0
-                    ? "No sessions yet. Start in the workspace with a meeting transcript."
-                    : `${analytics.totalSessions} workspace session${analytics.totalSessions === 1 ? "" : "s"} stored — ${analytics.overallProjects} with analyzed meeting output.`}
-                </>
-              ) : (
-                "Loading session analytics…"
-              )}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/workspace"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-primary to-[#A65A2C] text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all shadow-sm"
-              >
-                <Sparkles className="h-4 w-4" />
-                Open workspace
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/session"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
-              >
-                Browse sessions
-              </Link>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
-            <ListTodo className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Quick start</h2>
-          </div>
-          <div className="p-5">
-            <ol className="space-y-3">
-              {[
-                "Open the workspace and paste a transcript",
-                "Run Analyze Meeting to generate outputs",
-                "Edit, export, or refine with AI per tab",
-              ].map((step, i) => (
-                <li key={i} className="flex gap-2.5 items-start">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                    {i + 1}
-                  </span>
-                  <span className="text-sm text-muted-foreground">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </motion.div>
-      </motion.div>
+      <DashboardStatsSection />
     </div>
   );
 }

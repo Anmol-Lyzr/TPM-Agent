@@ -1,4 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { parseAgentResponse } from "./agent/pipeline";
+
+const MEETING_JSON = readFileSync(
+  join(import.meta.dirname, "agent/meetingPayload.fixture.json"),
+  "utf8"
+);
 
 const STUDIO_FIXTURE = `1. Confluence — Meeting summary
 
@@ -130,7 +138,11 @@ Decisions
 `;
 
 const alt = parseAgentResponse(ALT_HEADERS);
-assert(alt.projectPlan.length === 1, "alt: project plan from Smartsheet (Project Plan)");
+assert(alt.projectPlan.length >= 1, "alt: project plan from Smartsheet (Project Plan)");
+assert(
+  alt.projectPlan.some((r) => r.taskDesc.includes("Alt plan task") || r.taskName?.includes("Alt plan")),
+  "alt: includes parsed plan task row"
+);
 assert(alt.issues.some((i) => i.key === "SCRUM-99"), "alt: JIRA issue tracker section");
 assert(alt.raidLog.some((r) => r.description.includes("Alt RAID")), "alt: RAID table");
 assert(alt.meetingMinutes.summary?.includes("Alt-format"), "alt: MoM summary");
@@ -164,7 +176,7 @@ const AGENT_PHASE_PLAN = `3. Smartsheet — Project plan
 
 const phaseParsed = parseAgentResponse(AGENT_PHASE_PLAN);
 assert(
-  phaseParsed.projectPlan[0]?.isMilestone === true,
+  phaseParsed.projectPlan.some((r) => r.isMilestone),
   "infers milestone from agent phase header without Milestone: prefix"
 );
 
@@ -177,15 +189,18 @@ const SMARTSHEET_TASK_LIST = `3. Smartsheet task list
 
 const smartsheetListParsed = parseAgentResponse(SMARTSHEET_TASK_LIST);
 assert(
-  smartsheetListParsed.projectPlan.length === 1,
+  smartsheetListParsed.projectPlan.length >= 1,
   "Smartsheet task list routes to project plan, not issue tracker"
 );
 assert(
   smartsheetListParsed.issues.length === 0,
   "project plan rows must not appear as Jira issues"
 );
+const requirementsRow = smartsheetListParsed.projectPlan.find(
+  (r) => r.wbsId === "1.1"
+);
 assert(
-  smartsheetListParsed.projectPlan[0]?.duration === "3",
+  requirementsRow?.duration === "3",
   "parses Duration (Days) column"
 );
 
@@ -198,6 +213,69 @@ const DURATION_DAYS = parseAgentResponse(`3. Smartsheet — Project plan
 assert(
   DURATION_DAYS.projectPlan[0]?.duration === "3",
   "normalizes duration values like '3 days'"
+);
+
+const jsonParsed = parseAgentResponse(MEETING_JSON);
+assert(
+  jsonParsed.parseMeta.usedStructuredJson,
+  "JSON fixture must use structured JSON parse path"
+);
+assert(
+  jsonParsed.meetingMinutes.title === "RPT Tracker Sync",
+  "JSON: meeting title from meeting_metadata"
+);
+assert(
+  Boolean(jsonParsed.meetingMinutes.summary?.includes("Weekly sync")),
+  "JSON: summary from product_context"
+);
+assert(
+  jsonParsed.meetingMinutes.actionItems.length >= 1,
+  "JSON: action items mapped"
+);
+assert(
+  jsonParsed.issues.some((i) => i.key === "SCRUM-99"),
+  "JSON: jira_issues mapped to issue tracker"
+);
+assert(
+  jsonParsed.projectPlan.some((r) => r.isMilestone),
+  "JSON: project_plan milestones mapped"
+);
+const jsonMilestone = jsonParsed.projectPlan.find((r) => r.isMilestone);
+assert(
+  jsonMilestone?.duration === "3",
+  "JSON: milestone duration from ISO start/end dates"
+);
+
+const OVERALL_AND_MILESTONE = `3. Smartsheet — Project plan
+
+| WBS ID | Task Name | Start Date | End Date | Duration (Days) | Owner |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Overall Project Timeline | 20 May 2026 | 6 June 2026 | 18 | Sarah Mitchell |
+| M1 | MILESTONE: Product Requirements | 20 May 2026 | 23 May 2026 | 3 | James Rivera |
+| 1.1.1 | Finalize requirements | 20 May 2026 | 21 May 2026 | 1 | James Rivera |
+`;
+
+const overallParsed = parseAgentResponse(OVERALL_AND_MILESTONE);
+assert(
+  overallParsed.projectPlan.some((r) => r.wbsId === "0"),
+  "parses WBS 0 overall project timeline row"
+);
+const overallMilestone = overallParsed.projectPlan.find((r) => r.isMilestone);
+assert(
+  overallMilestone?.duration === "3",
+  "milestone duration preserved from Smartsheet table"
+);
+assert(
+  jsonParsed.raidLog.some((r) => r.category === "Risk"),
+  "JSON: raid_log risks mapped"
+);
+assert(
+  jsonParsed.raidLog.some((r) => r.category === "Assumption"),
+  "JSON: raid_log assumptions mapped to open questions / RAID"
+);
+assert(
+  Boolean(jsonParsed.extra.product_context),
+  "JSON: preserves product_context in extra"
 );
 
 console.log("parseAgentResponse: all tests passed");

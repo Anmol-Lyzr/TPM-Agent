@@ -69,13 +69,20 @@ export function normalizeJiraIssueRow(raw: unknown, index: number): JiraIssueRow
       : {};
 
   const parsed = JiraIssueRowSchema.safeParse({
-    key: asString(obj.key, `NEW-${index + 1}`),
-    summary: asString(obj.summary, asString(obj.key, `Issue ${index + 1}`)),
+    key: asString(
+      obj.key ?? obj.issue_key ?? obj.issueKey,
+      `NEW-${index + 1}`
+    ),
+    summary: asString(
+      obj.summary,
+      asString(obj.key ?? obj.issue_key, `Issue ${index + 1}`)
+    ),
     action: normalizeJiraAction(obj.action),
     status: asString(obj.status) || undefined,
-    issueType: asString(obj.issueType ?? obj.type) || undefined,
+    issueType:
+      asString(obj.issueType ?? obj.issue_type ?? obj.type) || undefined,
     assignee: asString(obj.assignee ?? obj.assignedTo) || undefined,
-    dueDate: asString(obj.dueDate ?? obj.due) || undefined,
+    dueDate: asString(obj.dueDate ?? obj.due_date ?? obj.due) || undefined,
     priority: asString(obj.priority) || undefined,
     url: asString(obj.url) || undefined,
     ...obj,
@@ -115,16 +122,21 @@ export function normalizeProjectPlanRow(raw: unknown): ProjectPlanRow {
   }
 
   const parsed = ProjectPlanRowSchema.safeParse({
-    wbsId: asString(obj.wbsId ?? obj.wbs) || undefined,
-    taskName: asString(obj.taskName ?? obj.name) || undefined,
+    wbsId:
+      asString(
+        obj.wbsId ?? obj.wbs ?? obj.milestone_id ?? obj.task_id
+      ) || undefined,
+    taskName: asString(obj.taskName ?? obj.name ?? obj.title) || undefined,
     taskDesc: asString(
-      obj.taskDesc ?? obj.task ?? obj.description
+      obj.taskDesc ?? obj.task ?? obj.description ?? obj.title
     ),
-    start: asString(obj.start),
-    end: asString(obj.end),
-    duration: asString(obj.duration),
+    start: asString(obj.start ?? obj.start_date),
+    end: asString(obj.end ?? obj.end_date),
+    duration: asString(obj.duration ?? obj.duration_days),
     owner: asString(obj.owner),
-    dependency: asString(obj.dependency ?? obj.predecessor),
+    dependency: asString(
+      obj.dependency ?? obj.predecessor ?? obj.dependency_ids
+    ),
     status: asString(obj.status) || undefined,
     priority: asString(obj.priority) || undefined,
     comments: asString(obj.comments ?? obj.comment),
@@ -147,12 +159,39 @@ export function normalizeProjectPlanRow(raw: unknown): ProjectPlanRow {
         comments: "",
       } satisfies ProjectPlanRow);
 
-  return enrichProjectPlan([base])[0] ?? base;
+  return enrichProjectPlanRow(base);
 }
 
 export function normalizeRaidLogRow(raw: unknown): RaidLogRow {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return normalizeRaidRow(raw as Partial<RaidLogRow>);
+    const obj = raw as Record<string, unknown>;
+    return normalizeRaidRow({
+      id: asString(
+        obj.id ??
+          obj.risk_id ??
+          obj.assumption_id ??
+          obj.issue_id ??
+          obj.dependency_id
+      ),
+      category: asString(obj.category) as RaidLogRow["category"],
+      description: asString(obj.description),
+      owner: asString(obj.owner),
+      impact: asString(obj.impact ?? obj.impact_if_invalid ?? obj.impact_if_delayed),
+      probability: asString(obj.probability),
+      status: asString(obj.status) as RaidLogRow["status"],
+      mitigation: asString(
+        obj.mitigation ??
+          obj.mitigation_strategy ??
+          obj.validation_approach ??
+          obj.resolution_path
+      ),
+      targetDate: asString(
+        obj.targetDate ??
+          obj.identified_date ??
+          obj.expected_resolution_date
+      ),
+      notes: asString(obj.notes ?? obj.contingency_plan),
+    } as Partial<RaidLogRow>);
   }
   return normalizeRaidRow({
     description: asString(raw),
@@ -177,11 +216,22 @@ export function normalizeMeetingMinutes(raw: unknown): MeetingMinutes {
       ? (raw as Record<string, unknown>)
       : {};
 
+  const meta =
+    obj.meeting_metadata && typeof obj.meeting_metadata === "object"
+      ? (obj.meeting_metadata as Record<string, unknown>)
+      : null;
+  const productContext =
+    obj.product_context && typeof obj.product_context === "object"
+      ? (obj.product_context as Record<string, unknown>)
+      : null;
+
   const parsed = MeetingMinutesSchema.safeParse({
-    title: asString(obj.title) || undefined,
-    date: asString(obj.date) || undefined,
+    title:
+      asString(obj.title ?? meta?.meeting_title) || undefined,
+    date: asString(obj.date ?? meta?.date) || undefined,
     attendees: asStringArray(obj.attendees),
-    summary: asString(obj.summary) || undefined,
+    summary:
+      asString(obj.summary ?? productContext?.description) || undefined,
     decisions: asStringArray(obj.decisions),
     actionItems: asStringArray(obj.actionItems ?? obj.action_items),
     risks: asStringArray(obj.risks),

@@ -8,7 +8,8 @@ import {
   raidRowsFromJiraBugs,
 } from "./raidLog";
 import { extractJiraIssuesFromTranscript } from "./jiraFromTranscript";
-import { SAMPLE_BUG_TRANSCRIPT, SAMPLE_TRANSCRIPT } from "./sampleTranscript";
+import { SAMPLE_TRANSCRIPT } from "./sampleTranscript";
+import { BUG_TRIAGE_TRANSCRIPT } from "./testFixtures/bugTriageTranscript";
 import type { MeetingMinutes } from "@/types/tpm";
 
 function assert(condition: boolean, message: string) {
@@ -92,8 +93,8 @@ assert(
 );
 assert(fromSample.length >= 4, "HMC sample transcript yields multiple RAID rows");
 
-const bugIssues = extractJiraIssuesFromTranscript(SAMPLE_BUG_TRANSCRIPT);
-const bugRaid = buildRaidLog("", "", { attendees: [], decisions: [], actionItems: [], risks: [], openQuestions: [] }, SAMPLE_BUG_TRANSCRIPT, bugIssues);
+const bugIssues = extractJiraIssuesFromTranscript(BUG_TRIAGE_TRANSCRIPT);
+const bugRaid = buildRaidLog("", "", { attendees: [], decisions: [], actionItems: [], risks: [], openQuestions: [] }, BUG_TRIAGE_TRANSCRIPT, bugIssues);
 assert(bugIssues.length === 11, "bug transcript yields 11 jira bugs");
 assert(bugRaid.length >= 11, `bug transcript yields RAID rows, got ${bugRaid.length}`);
 assert(

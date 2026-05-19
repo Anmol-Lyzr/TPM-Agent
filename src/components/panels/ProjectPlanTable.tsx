@@ -17,9 +17,11 @@ import {
 import {
   enrichProjectPlan,
   enrichProjectPlanRow,
+  getPlanDuration,
   getPlanTaskDescription,
   getPlanTaskName,
   getPlanWbsId,
+  isOverallProjectTimelineRow,
   isProjectPlanMilestone,
   PROJECT_PLAN_COLUMNS,
 } from "@/lib/projectPlan";
@@ -107,18 +109,22 @@ export function ProjectPlanTable({
         <tbody>
           {displayRows.map((row, i) => {
             const milestone = isProjectPlanMilestone(row);
+            const overall = isOverallProjectTimelineRow(row);
             const wbsId = getPlanWbsId(row);
             const taskName = getPlanTaskName(row);
             const taskDescription = getPlanTaskDescription(row);
+            const duration = getPlanDuration(row);
 
             return (
               <tr
                 key={`${wbsId || i}-${taskName}`}
                 className={cn(
                   "border-b border-border/30",
-                  milestone
-                    ? "bg-primary/[0.06] font-medium"
-                    : "hover:bg-black/[0.02]"
+                  overall
+                    ? "bg-amber-500/[0.08] font-semibold"
+                    : milestone
+                      ? "bg-primary/[0.06] font-medium"
+                      : "hover:bg-black/[0.02]"
                 )}
               >
                 <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">
@@ -212,7 +218,7 @@ export function ProjectPlanTable({
                       className={cn(cellInput, "w-14")}
                     />
                   ) : (
-                    row.duration || "—"
+                    duration || "—"
                   )}
                 </td>
                 <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">

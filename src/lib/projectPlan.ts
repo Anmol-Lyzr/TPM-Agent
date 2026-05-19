@@ -36,9 +36,29 @@ const MONTH_INDEX: Record<string, number> = {
   dec: 11,
 };
 
-function parsePlanDate(value: string): Date | null {
+export function parsePlanDate(value: string): Date | null {
   const text = stripPlanMarkdown(value);
   if (!text) return null;
+
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    return new Date(
+      parseInt(iso[1], 10),
+      parseInt(iso[2], 10) - 1,
+      parseInt(iso[3], 10)
+    );
+  }
+
+  const dmyDash = text.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (dmyDash) {
+    const month = MONTH_INDEX[dmyDash[2].slice(0, 3).toLowerCase()];
+    if (month === undefined) return null;
+    return new Date(
+      parseInt(dmyDash[3], 10),
+      month,
+      parseInt(dmyDash[1], 10)
+    );
+  }
 
   const dmy = text.match(/^(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?$/);
   if (dmy) {
@@ -67,6 +87,62 @@ function computeDurationDays(start: string, end: string): number | null {
   );
   if (diff < 0) return null;
   return diff === 0 ? 1 : diff;
+}
+
+/** Resolved duration for display/export (uses stored value or start/end). */
+export function getPlanDuration(row: ProjectPlanRow): string {
+  return normalizePlanDuration(row.duration, row.start, row.end);
+}
+
+/** WBS 0 / "Overall Project Timeline" summary row at top of schedule. */
+export function isOverallProjectTimelineRow(row: ProjectPlanRow): boolean {
+  const wbsId = getPlanWbsId(row);
+  if (wbsId === "0") return true;
+  const name = getPlanTaskName(row).toLowerCase();
+  return (
+    name.includes("overall project timeline") ||
+    name === "overall timeline" ||
+    name === "overall project schedule"
+  );
+}
+
+/** Insert WBS 0 row from min/max dates when the agent omits it. */
+export function ensureOverallProjectTimeline(
+  rows: ProjectPlanRow[]
+): ProjectPlanRow[] {
+  if (rows.some(isOverallProjectTimelineRow)) return rows;
+
+  let earliest: { date: Date; label: string } | null = null;
+  let latest: { date: Date; label: string } | null = null;
+
+  for (const row of rows) {
+    if (!row.start?.trim() && !row.end?.trim()) continue;
+    const startDate = parsePlanDate(row.start);
+    const endDate = parsePlanDate(row.end);
+    if (startDate && (!earliest || startDate < earliest.date)) {
+      earliest = { date: startDate, label: row.start };
+    }
+    if (endDate && (!latest || endDate > latest.date)) {
+      latest = { date: endDate, label: row.end };
+    }
+  }
+
+  if (!earliest || !latest) return rows;
+
+  const overall = enrichProjectPlanRow({
+    wbsId: "0",
+    taskName: "Overall Project Timeline",
+    taskDesc: "End-to-end project schedule span",
+    start: earliest.label,
+    end: latest.label,
+    duration: normalizePlanDuration("", earliest.label, latest.label),
+    owner: "",
+    dependency: "",
+    comments: "",
+    status: "In Progress",
+  });
+
+  return [overall, ...rows];
 }
 
 /** Normalize agent duration cells ("3 days", auto-calc from dates). */
@@ -389,7 +465,7 @@ function asMilestoneRow(
     isMilestone: true,
     milestoneTitle: title,
     taskName: formatMilestoneTaskName(title),
-    duration: "",
+    duration: getPlanDuration(normalized),
     taskNumber: undefined,
   };
 }
@@ -448,7 +524,7 @@ export function enrichProjectPlan(rows: ProjectPlanRow[]): ProjectPlanRow[] {
   const validated = withMilestones.map((row) =>
     isProjectPlanMilestone(row) ? row : asDeliveryTaskRow(row)
   );
-  return assignMilestoneWbsIds(validated);
+  return ensureOverallProjectTimeline(assignMilestoneWbsIds(validated));
 }
 
 const JIRA_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/g;

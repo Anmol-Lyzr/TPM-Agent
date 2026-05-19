@@ -1,0 +1,154 @@
+{
+  "meeting_metadata": {
+    "meeting_title": "RPT Tracker Sync",
+    "date": "2026-05-15",
+    "duration_minutes": 45,
+    "sprint": "Sprint 12",
+    "pilot_installation": {
+      "name": "Site A",
+      "location": "NYC",
+      "status": "Active"
+    },
+    "recording_available": true,
+    "platform": "MS Teams"
+  },
+  "attendees": [
+    {
+      "name": "Monisha Anandaraj",
+      "initials": "MA",
+      "role": "PM",
+      "organization": "Acme"
+    }
+  ],
+  "product_context": {
+    "product_name": "RPT Tracker",
+    "description": "Weekly sync on the RPT tracker and Excel bug list.",
+    "core_capabilities": ["Bug tracking"],
+    "value_propositions": ["Faster triage"]
+  },
+  "discussion_topics": [
+    {
+      "topic_id": "T1",
+      "title": "Bug backlog",
+      "summary": "Reviewed open defects.",
+      "details": {
+        "key_points": ["SCRUM-3 needs comment"],
+        "risks": ["Reminder agent depends on Lovable tracker"],
+        "decisions": [],
+        "dependencies": []
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "D1",
+      "decision": "SCRUM-3 remains To Do",
+      "made_by": ["Monisha Anandaraj"],
+      "priority": "Medium",
+      "related_modules": ["Tracker"]
+    }
+  ],
+  "action_items": [
+    {
+      "action_id": "A1",
+      "title": "Add comment to SCRUM-3",
+      "description": "Follow up on SCRUM-3",
+      "owner": ["Monisha Anandaraj"],
+      "sprint": "Sprint 12",
+      "status": "To Do",
+      "priority": "Medium",
+      "due_date": "2026-05-18",
+      "target_outcome": "Comment posted",
+      "dependencies": []
+    }
+  ],
+  "sprint_priorities": [],
+  "jira_issues": [
+    {
+      "issue_key": "SCRUM-99",
+      "issue_type": "Bug",
+      "summary": "Alt bug row",
+      "description": "Repro steps",
+      "priority": "High",
+      "status": "Open",
+      "assignee": "Monisha Anandaraj",
+      "reporter": "Anmol Varshney",
+      "sprint": "Sprint 12",
+      "epic": "",
+      "labels": [],
+      "story_points": 3,
+      "blocked_by": [],
+      "due_date": "2026-05-21",
+      "acceptance_criteria": ["Fix verified"]
+    }
+  ],
+  "project_plan": {
+    "assumptions": {
+      "sprint_duration_weeks": 2,
+      "target_ga_date": "2026-08-01"
+    },
+    "milestones": [
+      {
+        "milestone_id": "M1",
+        "title": "Product Requirements & Discovery",
+        "start_date": "2026-05-20",
+        "end_date": "2026-05-23",
+        "owner": "James Rivera",
+        "status": "In Progress",
+        "dependencies": [],
+        "tasks": [
+          {
+            "task_id": "1.1.1",
+            "title": "Finalize requirements v1.0",
+            "description": "Finalize Resident Connect product requirements v1.0",
+            "start_date": "2026-05-20",
+            "end_date": "2026-05-21",
+            "duration_days": 1,
+            "owner": "James Rivera",
+            "status": "To Do",
+            "dependency_ids": [],
+            "comments": ""
+          }
+        ]
+      }
+    ]
+  },
+  "bug_tracker": [],
+  "raid_log": {
+    "risks": [
+      {
+        "risk_id": "R1",
+        "description": "Alt RAID risk",
+        "category": "Delivery",
+        "probability": "Medium",
+        "impact": "High",
+        "risk_level": "High",
+        "owner": "PM",
+        "identified_date": "2026-05-15",
+        "mitigation_strategy": "Monitor",
+        "contingency_plan": "Escalate",
+        "status": "Open",
+        "related_tasks": []
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption_id": "AS1",
+        "description": "Target dates for Excel bugs?",
+        "owner": "PM",
+        "identified_date": "2026-05-15",
+        "impact_if_invalid": "Schedule slip",
+        "validation_approach": "Confirm with stakeholders",
+        "status": "Open"
+      }
+    ],
+    "issues": [],
+    "dependencies": []
+  },
+  "metadata": {
+    "generated_at": "2026-05-15T10:00:00Z",
+    "generated_by": "TPM Agent",
+    "source": "Meeting Transcript",
+    "document_version": "1.0"
+  }
+}

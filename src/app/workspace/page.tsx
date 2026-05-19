@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { TranscriptPanel } from "@/components/input/TranscriptPanel";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
-import {
-  SAMPLE_BUG_TRANSCRIPT,
-  SAMPLE_TRANSCRIPT,
-} from "@/lib/sampleTranscript";
+import { SAMPLE_TRANSCRIPT } from "@/lib/sampleTranscript";
 import { postAgent } from "@/lib/agentClient";
 import { buildRefineMessage } from "@/lib/buildRefineMessage";
 import { AGENT_ID, emptyParsed } from "@/lib/constants";
@@ -188,10 +185,6 @@ export default function WorkspacePage() {
     setTranscript(SAMPLE_TRANSCRIPT);
   }, []);
 
-  const handleLoadBugSample = useCallback(() => {
-    setTranscript(SAMPLE_BUG_TRANSCRIPT);
-  }, []);
-
   const showEmpty = !hasRun && !isLoading;
 
   return (
@@ -207,7 +200,6 @@ export default function WorkspacePage() {
           onAnalyze={handleAnalyze}
           onNewMeeting={handleNewMeeting}
           onLoadSample={handleLoadSample}
-          onLoadBugSample={handleLoadBugSample}
         />
       </aside>
 

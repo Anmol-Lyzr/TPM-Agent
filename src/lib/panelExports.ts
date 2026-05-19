@@ -17,6 +17,7 @@ import {
   getPlanTaskDescription,
   getPlanTaskName,
   getPlanWbsId,
+  getPlanDuration,
   PROJECT_PLAN_COLUMNS,
 } from "@/lib/projectPlan";
 
@@ -28,7 +29,7 @@ function projectPlanToSheetRow(row: ProjectPlanRow): SheetRow {
     [PROJECT_PLAN_COLUMNS[3]]: row.owner,
     [PROJECT_PLAN_COLUMNS[4]]: row.start,
     [PROJECT_PLAN_COLUMNS[5]]: row.end,
-    [PROJECT_PLAN_COLUMNS[6]]: row.duration,
+    [PROJECT_PLAN_COLUMNS[6]]: getPlanDuration(row),
     [PROJECT_PLAN_COLUMNS[7]]: row.dependency,
     [PROJECT_PLAN_COLUMNS[8]]: row.status ?? "",
     [PROJECT_PLAN_COLUMNS[9]]: row.priority ?? "",

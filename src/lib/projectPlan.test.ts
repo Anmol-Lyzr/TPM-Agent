@@ -1,8 +1,11 @@
 import {
   enrichProjectPlan,
   enrichProjectPlanRow,
+  ensureOverallProjectTimeline,
   filterBugsFromProjectPlan,
+  getPlanDuration,
   isBugProjectPlanRow,
+  isOverallProjectTimelineRow,
   isProjectPlanMilestone,
   normalizePlanDuration,
   parseMilestoneDescriptor,
@@ -37,6 +40,10 @@ assert(
   "milestone task name uses Smartsheet format"
 );
 assert(isProjectPlanMilestone(enriched), "isProjectPlanMilestone");
+assert(
+  getPlanDuration(enriched) === "3",
+  "milestone duration computed from start/end when cell empty"
+);
 
 const task = enrichProjectPlanRow({
   taskDesc: "Finalize product requirements v1.0",
@@ -56,6 +63,10 @@ assert(
 assert(
   normalizePlanDuration("", "20 May 2026", "23 May 2026") === "3",
   "computes duration from start/end when cell empty"
+);
+assert(
+  normalizePlanDuration("", "2026-05-20", "2026-05-23") === "3",
+  "computes duration from ISO dates"
 );
 
 const agentStyle = enrichProjectPlan([
@@ -78,13 +89,24 @@ const agentStyle = enrichProjectPlan([
     comments: "",
   },
 ]);
+const agentMilestone = agentStyle.find((r) => r.isMilestone);
+const agentTask = agentStyle.find((r) => !r.isMilestone && !isOverallProjectTimelineRow(r));
+assert(agentMilestone?.isMilestone === true, "infers milestone when agent omits Milestone: label");
+assert(agentTask?.isMilestone !== true, "detail task stays a task");
 assert(
-  agentStyle[0]?.isMilestone === true,
-  "infers milestone when agent omits Milestone: label"
+  getPlanDuration(agentMilestone!) === "3",
+  "inferred milestone keeps timeline duration"
+);
+
+const withoutOverall = agentStyle.filter((r) => !isOverallProjectTimelineRow(r));
+const withOverall = ensureOverallProjectTimeline(withoutOverall);
+assert(
+  isOverallProjectTimelineRow(withOverall[0]!),
+  "synthesizes Overall Project Timeline when missing"
 );
 assert(
-  agentStyle[1]?.isMilestone !== true,
-  "detail task stays a task"
+  getPlanDuration(withOverall[0]!) === "3",
+  "overall row duration spans plan dates"
 );
 
 const boldPhase = enrichProjectPlan([
@@ -107,8 +129,13 @@ const boldPhase = enrichProjectPlan([
     comments: "",
   },
 ]);
-assert(boldPhase[0]?.isMilestone === true, "bold-only phase row is milestone");
-assert(boldPhase[0]?.wbsId === "M1", "assigns M1 to first milestone");
+const boldMilestone = boldPhase.find((r) => r.isMilestone);
+assert(boldMilestone?.isMilestone === true, "bold-only phase row is milestone");
+assert(boldMilestone?.wbsId === "M1", "assigns M1 to first milestone");
+assert(
+  getPlanDuration(boldMilestone!) === "11",
+  "milestone duration spans bold phase dates through 6 June"
+);
 
 const wbsRow = enrichProjectPlanRow({
   wbsId: "1.1.1",

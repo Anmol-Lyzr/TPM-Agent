@@ -1,11 +1,11 @@
 import { extractJiraIssuesFromTranscript } from "./jiraFromTranscript";
-import { SAMPLE_BUG_TRANSCRIPT } from "./sampleTranscript";
+import { BUG_TRIAGE_TRANSCRIPT } from "./testFixtures/bugTriageTranscript";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-const bugs = extractJiraIssuesFromTranscript(SAMPLE_BUG_TRANSCRIPT);
+const bugs = extractJiraIssuesFromTranscript(BUG_TRIAGE_TRANSCRIPT);
 
 assert(bugs.length === 11, `expected 11 bugs, got ${bugs.length}`);
 assert(

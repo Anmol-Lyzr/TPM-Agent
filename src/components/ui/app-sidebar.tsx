@@ -7,6 +7,9 @@ import {
   IconTerminal2,
   IconFolderOpen,
   IconSettings,
+  IconPlugConnected,
+  IconBook,
+  IconSitemap,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/ui/nav-main"
@@ -36,6 +39,19 @@ const data = {
     { title: "Agent Console", url: "/console", icon: IconMessages },
     { title: "Projects", url: "/session", icon: IconFolderOpen },
   ],
+  navTools: [
+    {
+      title: "Tools & Config",
+      url: "/tools",
+      icon: IconPlugConnected,
+      subItems: [
+        { title: "Skills Library", url: "/tools/skills", icon: IconBook },
+        { title: "Integrations", url: "/tools", icon: IconPlugConnected },
+        { title: "Agent Architecture", url: "/tools/architecture", icon: IconSitemap },
+        { title: "File System", url: "/tools/files", icon: IconFolderOpen },
+      ],
+    },
+  ],
   navSecondary: [
     { title: "Settings", url: "#", icon: IconSettings },
   ],
@@ -58,6 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
+        <NavMain items={data.navTools} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
