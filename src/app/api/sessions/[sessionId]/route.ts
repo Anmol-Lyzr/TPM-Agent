@@ -48,10 +48,16 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     const transcript =
       typeof body.transcript === "string" ? body.transcript : undefined;
 
-    const doc = await upsertSession(sessionId.trim(), {
-      payload: payload ?? null,
-      transcript,
-    });
+    let doc;
+    try {
+      doc = await upsertSession(sessionId.trim(), {
+        payload: payload ?? null,
+        transcript,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
 
     return NextResponse.json({
       sessionId: doc.sessionId,

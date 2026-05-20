@@ -1,15 +1,5 @@
 const LYZR_API_URL = "https://agent-prod.studio.lyzr.ai/v3/inference/chat/";
 
-import { formatAgentTextReply } from "@/lib/formatAgentText";
-
-export function extractReply(data: Record<string, unknown>): string {
-  return formatAgentTextReply(data);
-}
-
-export function normalizeReply(reply: string): string {
-  return reply.replace(/\\n/g, "\n");
-}
-
 export interface CallAgentParams {
   message: string;
   sessionId: string;
@@ -19,7 +9,6 @@ export interface CallAgentParams {
 }
 
 export interface CallAgentResult {
-  reply: string;
   sessionId: string;
   raw: Record<string, unknown>;
 }
@@ -27,7 +16,7 @@ export interface CallAgentResult {
 export async function callAgent(
   params: CallAgentParams
 ): Promise<CallAgentResult> {
-  const upstreamRes = await fetch(LYZR_API_URL, {
+  const res = await fetch(LYZR_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -41,18 +30,17 @@ export async function callAgent(
     }),
   });
 
-  if (!upstreamRes.ok) {
-    const text = await upstreamRes.text();
-    throw new Error(`Upstream error ${upstreamRes.status}: ${text}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upstream error ${res.status}: ${text}`);
   }
 
-  const data = (await upstreamRes.json()) as Record<string, unknown>;
-  const reply = extractReply(data);
+  const data = (await res.json()) as Record<string, unknown>;
   const sessionId =
     (typeof data.session_id === "string" && data.session_id) ||
     params.sessionId;
 
-  return { reply, sessionId, raw: data };
+  return { sessionId, raw: data };
 }
 
 export function createSessionId(agentId: string): string {

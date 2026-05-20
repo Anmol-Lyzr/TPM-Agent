@@ -175,30 +175,29 @@ export function ProjectPlanTable({
                 {/* Milestone header row */}
                 <tr
                   key={`m-${milestone.milestone_id}`}
-                  className="border-b border-border/50 bg-slate-100/80 dark:bg-slate-800/50"
+                  className="border-b border-border/50 bg-muted/50"
                 >
-                  <td className="px-2 py-2.5 align-middle font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  <td className="px-2 py-2.5 align-middle font-mono text-[11px] font-semibold text-primary/70">
                     {milestone.milestone_id || "—"}
                   </td>
                   <td className="px-2 py-2.5 align-middle">
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    <span className="font-semibold text-foreground">
                       {milestone.title || "—"}
                     </span>
                   </td>
                   <td className="max-w-[200px] px-2 py-2.5 align-middle text-muted-foreground">
-                    {/* milestones don't have a description field */}
                     —
                   </td>
                   <td className="px-2 py-2.5 align-middle text-muted-foreground">
                     {milestone.owner || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-foreground/80">
                     {agg?.start || milestone.start_date || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                  <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-foreground/80">
                     {agg?.end || milestone.end_date || "—"}
                   </td>
-                  <td className="px-2 py-2.5 align-middle font-medium text-slate-700 dark:text-slate-200">
+                  <td className="px-2 py-2.5 align-middle font-medium text-foreground/80">
                     {agg ? (agg.totalDuration > 0 ? agg.totalDuration : "—") : (milestone.milestone_timeline_duration ?? "—")}
                   </td>
                   <td className="px-2 py-2.5 align-middle font-mono text-[11px] text-muted-foreground">
