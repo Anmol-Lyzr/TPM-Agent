@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Bot, Loader2, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
@@ -74,11 +72,7 @@ export function DashboardChatThread({
                   : "text-foreground prose-agent text-sm"
               )}
             >
-              {msg.role === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-              )}
+              <p className="whitespace-pre-wrap">{msg.content}</p>
             </div>
           </div>
         ))}

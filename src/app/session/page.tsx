@@ -6,8 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, Trash2 } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import { SessionListPanel } from "@/components/session/SessionListPanel";
-import { emptyParsed } from "@/lib/constants";
-import { enrichParsedRaid } from "@/lib/raidLog";
 import {
   clearStoredSessionId,
   getStoredSessionId,
@@ -19,19 +17,7 @@ import {
   saveSession,
   type SessionListItem,
 } from "@/lib/sessionStore";
-import type { ParsedAgentResponse } from "@/types/tpm";
-
-function sessionListCounts(
-  parsed: ParsedAgentResponse,
-  hasTranscript: boolean
-) {
-  return {
-    planCount: parsed.projectPlan.length,
-    issuesCount: parsed.issues.length,
-    raidCount: parsed.raidLog.length,
-    hasTranscript,
-  };
-}
+import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
 function SessionViewContent() {
   const router = useRouter();
@@ -41,18 +27,14 @@ function SessionViewContent() {
   const [listError, setListError] = useState<string | null>(null);
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [parsed, setParsed] = useState<ParsedAgentResponse>(emptyParsed);
+  const [payload, setPayload] = useState<MeetingMinutesPayload | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
-  const [rawReply, setRawReply] = useState<string | null>(null);
-  const [rawReplyLoading, setRawReplyLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
-    null
-  );
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const loadingIdRef = useRef<string | null>(null);
   const lastLoadedRef = useRef<string | null>(null);
   const pendingEditRef = useRef<string | null>(null);
@@ -69,9 +51,7 @@ function SessionViewContent() {
       const list = await fetchSessionList();
       setSessions(list);
     } catch (err) {
-      setListError(
-        err instanceof Error ? err.message : "Failed to load sessions"
-      );
+      setListError(err instanceof Error ? err.message : "Failed to load sessions");
     } finally {
       setListLoading(false);
     }
@@ -81,67 +61,43 @@ function SessionViewContent() {
     void refreshList();
   }, [refreshList]);
 
-  const loadSession = useCallback(
-    async (id: string, options?: { force?: boolean }) => {
-      const trimmed = id.trim();
-      if (!trimmed) return;
+  const loadSession = useCallback(async (id: string, options?: { force?: boolean }) => {
+    const trimmed = id.trim();
+    if (!trimmed) return;
+    if (!options?.force && trimmed === lastLoadedRef.current) return;
 
-      if (!options?.force && trimmed === lastLoadedRef.current) return;
+    loadingIdRef.current = trimmed;
+    setDetailLoading(true);
+    setDetailError(null);
+    setSaveError(null);
 
-      loadingIdRef.current = trimmed;
-      setDetailLoading(true);
-      setDetailError(null);
-      setSaveError(null);
-      setRawReply(null);
+    try {
+      const data = await fetchSession(trimmed);
+      if (loadingIdRef.current !== trimmed) return;
 
-      try {
-        const data = await fetchSession(trimmed);
-        if (loadingIdRef.current !== trimmed) return;
-
-        if (!data) {
-          setDetailError("Session data could not be loaded.");
-          setHasLoaded(false);
-          lastLoadedRef.current = null;
-          return;
-        }
-
-        const enriched = enrichParsedRaid(
-          data.parsed,
-          data.transcript ?? undefined
-        );
-
-        setLoadedSessionId(trimmed);
-        setParsed(enriched);
-        setTranscript(data.transcript ?? null);
-        setRawReply(data.rawReply ?? null);
-        setHasLoaded(true);
-        lastLoadedRef.current = trimmed;
-      } catch (err) {
-        if (loadingIdRef.current !== trimmed) return;
-        setDetailError(
-          err instanceof Error ? err.message : "Failed to load session"
-        );
+      if (!data) {
+        setDetailError("Session data could not be loaded.");
         setHasLoaded(false);
         lastLoadedRef.current = null;
-      } finally {
-        if (loadingIdRef.current === trimmed) {
-          setDetailLoading(false);
-        }
+        return;
       }
-    },
-    []
-  );
 
-  const loadRawReply = useCallback(async () => {
-    if (!loadedSessionId || rawReply || rawReplyLoading) return;
-    setRawReplyLoading(true);
-    try {
-      const data = await fetchSession(loadedSessionId, { includeRaw: true });
-      if (data?.rawReply) setRawReply(data.rawReply);
+      setLoadedSessionId(trimmed);
+      setPayload(data.payload ?? null);
+      setTranscript(data.transcript ?? null);
+      setHasLoaded(true);
+      lastLoadedRef.current = trimmed;
+    } catch (err) {
+      if (loadingIdRef.current !== trimmed) return;
+      setDetailError(err instanceof Error ? err.message : "Failed to load session");
+      setHasLoaded(false);
+      lastLoadedRef.current = null;
     } finally {
-      setRawReplyLoading(false);
+      if (loadingIdRef.current === trimmed) {
+        setDetailLoading(false);
+      }
     }
-  }, [loadedSessionId, rawReply, rawReplyLoading]);
+  }, []);
 
   useEffect(() => {
     const fromUrl = searchParams.get("id")?.trim();
@@ -163,9 +119,7 @@ function SessionViewContent() {
       setEditingSessionId(null);
       pendingEditRef.current = null;
       if (trimmed === searchParams.get("id")?.trim() && hasLoaded) return;
-      router.replace(`/session?id=${encodeURIComponent(trimmed)}`, {
-        scroll: false,
-      });
+      router.replace(`/session?id=${encodeURIComponent(trimmed)}`, { scroll: false });
     },
     [router, searchParams, hasLoaded]
   );
@@ -176,9 +130,8 @@ function SessionViewContent() {
     pendingEditRef.current = null;
     setEditingSessionId(null);
     setLoadedSessionId(null);
-    setParsed(emptyParsed);
+    setPayload(null);
     setTranscript(null);
-    setRawReply(null);
     setHasLoaded(false);
     setDetailError(null);
     setSaveError(null);
@@ -200,9 +153,7 @@ function SessionViewContent() {
 
       const urlId = searchParams.get("id")?.trim();
       if (urlId !== trimmed) {
-        router.replace(`/session?id=${encodeURIComponent(trimmed)}`, {
-          scroll: false,
-        });
+        router.replace(`/session?id=${encodeURIComponent(trimmed)}`, { scroll: false });
         return;
       }
 
@@ -211,55 +162,7 @@ function SessionViewContent() {
         void loadSession(trimmed, { force: true });
       }
     },
-    [
-      deletingSessionId,
-      editingSessionId,
-      hasLoaded,
-      loadedSessionId,
-      loadSession,
-      router,
-      searchParams,
-    ]
-  );
-
-  const handleParsedChange = useCallback(
-    async (next: ParsedAgentResponse) => {
-      setParsed(next);
-      if (!loadedSessionId || editingSessionId !== loadedSessionId) return;
-
-      setSaving(true);
-      setSaveError(null);
-      try {
-        await saveSession(loadedSessionId, {
-          parsed: next,
-          transcript: transcript ?? undefined,
-          rawReply: rawReply ?? undefined,
-        });
-        const counts = sessionListCounts(
-          next,
-          Boolean(transcript?.trim())
-        );
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.sessionId === loadedSessionId
-              ? {
-                  ...s,
-                  ...counts,
-                  title: next.meetingMinutes.title?.trim() || s.title,
-                  updatedAt: new Date().toISOString(),
-                }
-              : s
-          )
-        );
-      } catch (err) {
-        setSaveError(
-          err instanceof Error ? err.message : "Failed to save to MongoDB"
-        );
-      } finally {
-        setSaving(false);
-      }
-    },
-    [loadedSessionId, editingSessionId, transcript, rawReply]
+    [deletingSessionId, editingSessionId, hasLoaded, loadedSessionId, loadSession, router, searchParams]
   );
 
   const handleDelete = useCallback(
@@ -293,22 +196,41 @@ function SessionViewContent() {
           router.replace("/session", { scroll: false });
         }
       } catch (err) {
-        setListError(
-          err instanceof Error ? err.message : "Failed to delete session"
-        );
+        setListError(err instanceof Error ? err.message : "Failed to delete session");
       } finally {
         setDeletingSessionId(null);
       }
     },
-    [
-      deletingSessionId,
-      editingSessionId,
-      searchParams,
-      loadedSessionId,
-      clearViewer,
-      router,
-    ]
+    [deletingSessionId, editingSessionId, searchParams, loadedSessionId, clearViewer, router]
   );
+
+  const handleSaveSession = useCallback(async () => {
+    if (!loadedSessionId || editingSessionId !== loadedSessionId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await saveSession(loadedSessionId, {
+        payload,
+        transcript: transcript ?? undefined,
+      });
+      const title = payload?.metadata?.meeting_title?.trim();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.sessionId === loadedSessionId
+            ? {
+                ...s,
+                title: title || s.title,
+                updatedAt: new Date().toISOString(),
+              }
+            : s
+        )
+      );
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save to MongoDB");
+    } finally {
+      setSaving(false);
+    }
+  }, [loadedSessionId, editingSessionId, payload, transcript]);
 
   return (
     <div className="flex flex-1 overflow-hidden app-bg">
@@ -356,7 +278,10 @@ function SessionViewContent() {
                   {isEditing ? (
                     <button
                       type="button"
-                      onClick={() => setEditingSessionId(null)}
+                      onClick={() => {
+                        setEditingSessionId(null);
+                        void handleSaveSession();
+                      }}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-primary to-[#A65A2C] px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
                     >
                       <Check className="h-4 w-4" />
@@ -377,8 +302,7 @@ function SessionViewContent() {
                     disabled={Boolean(deletingSessionId) || isEditing}
                     onClick={() => {
                       const title =
-                        sessions.find((s) => s.sessionId === loadedSessionId)
-                          ?.title ?? loadedSessionId;
+                        sessions.find((s) => s.sessionId === loadedSessionId)?.title ?? loadedSessionId;
                       void handleDelete(loadedSessionId, title);
                     }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 disabled:opacity-50 transition-colors"
@@ -410,15 +334,11 @@ function SessionViewContent() {
           ) : null}
 
           <DashboardTabs
-            parsed={parsed}
-            onParsedChange={(next) => void handleParsedChange(next)}
+            payload={payload}
             sessionId={loadedSessionId}
             isLoading={detailLoading}
             hasRun={hasLoaded}
             showEmpty={!hasLoaded && !detailLoading}
-            readOnly={!isEditing}
-            loadingMessage="Loading saved session…"
-            loadingSubmessage="Fetching meeting output from MongoDB."
           />
 
           {transcript && hasLoaded ? (
@@ -429,29 +349,6 @@ function SessionViewContent() {
               <pre className="max-h-48 overflow-auto border-t border-black/[0.05] p-4 text-xs whitespace-pre-wrap text-muted-foreground">
                 {transcript}
               </pre>
-            </details>
-          ) : null}
-
-          {hasLoaded ? (
-            <details
-              className="mt-4 shrink-0 rounded-xl glass-card"
-              onToggle={(e) => {
-                if ((e.target as HTMLDetailsElement).open) void loadRawReply();
-              }}
-            >
-              <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-muted-foreground">
-                View raw agent response
-                {rawReplyLoading ? " (loading…)" : null}
-              </summary>
-              {rawReply ? (
-                <pre className="max-h-48 overflow-auto border-t border-black/[0.05] p-4 text-xs whitespace-pre-wrap text-muted-foreground">
-                  {rawReply}
-                </pre>
-              ) : rawReplyLoading ? (
-                <p className="border-t border-black/[0.05] p-4 text-xs text-muted-foreground">
-                  Loading raw response…
-                </p>
-              ) : null}
             </details>
           ) : null}
         </div>

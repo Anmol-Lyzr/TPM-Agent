@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CONSOLE_AGENT_ID } from "@/lib/constants";
 import { getSession } from "@/lib/db/sessions";
-import { formatAgentTextReply } from "@/lib/formatAgentText";
 import { buildMeetingContextBlock } from "@/lib/meetingContext";
 import { callAgent, createSessionId } from "@/lib/lyzr";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+const TEXT_FIELD_KEYS = [
+  "answer_markdown", "answer", "markdown", "response",
+  "message", "content", "reply", "output", "result", "text",
+] as const;
+
+function extractTextReply(raw: Record<string, unknown>): string {
+  for (const key of TEXT_FIELD_KEYS) {
+    const val = raw[key];
+    if (typeof val === "string" && val.trim()) return val.replace(/\\n/g, "\n").trim();
+  }
+  return JSON.stringify(raw);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,8 +59,8 @@ export async function POST(req: NextRequest) {
       meetingContext = buildMeetingContextBlock({
         sessionId: doc.sessionId,
         transcript: doc.transcript,
-        parsed: doc.parsed,
-        title: doc.parsed.meetingMinutes?.title,
+        payload: doc.payload,
+        title: doc.payload?.metadata?.meeting_title,
       });
     }
 
@@ -56,12 +68,12 @@ export async function POST(req: NextRequest) {
       (typeof body.session_id === "string" && body.session_id.trim()) ||
       createSessionId(agentId);
 
-    const payload = meetingContext
+    const prompt = meetingContext
       ? `${meetingContext}\n\nUser question:\n${message}`
       : message;
 
-    const { reply, sessionId: returnedSessionId, raw } = await callAgent({
-      message: payload,
+    const { sessionId: returnedSessionId, raw } = await callAgent({
+      message: prompt,
       sessionId,
       apiKey,
       agentId,
@@ -69,7 +81,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      reply: formatAgentTextReply(reply.trim() ? reply : raw),
+      reply: extractTextReply(raw),
       session_id: returnedSessionId,
       meeting_attached: Boolean(meetingContext),
     });

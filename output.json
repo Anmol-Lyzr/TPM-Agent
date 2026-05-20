@@ -1,0 +1,294 @@
+{
+    "name": "Meeting Minutes and Project Tracking Schema",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "description": "Metadata about the meeting",
+          "properties": {
+            "meeting_title": { "type": "string", "description": "Title of the meeting" },
+            "date": { "type": "string", "format": "date", "description": "Meeting date in YYYY-MM-DD" },
+            "duration_minutes": { "type": "number", "description": "Duration of the meeting in minutes" },
+            "sprint": { "type": "string", "description": "Associated sprint" },
+            "pilot_installation": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "location": { "type": "string" },
+                "status": { "type": "string" }
+              },
+              "additionalProperties": false,
+              "required": ["name", "location", "status"]
+            },
+            "recording_available": { "type": "boolean" },
+            "platform": { "type": "string" }
+          },
+          "additionalProperties": false,
+          "required": ["meeting_title", "date", "duration_minutes", "sprint", "pilot_installation", "recording_available", "platform"]
+        },
+        "minutes_of_meeting": {
+          "type": "object",
+          "description": "Structured minutes of the meeting",
+          "properties": {
+            "purpose": { "type": "string" },
+            "key_decisions": {
+              "type": "array",
+              "description": "Key decisions made during the meeting. IDs: D-1, D-2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "decision_id": { "type": "string", "description": "e.g. D-1, D-2" },
+                  "decision": { "type": "string" },
+                  "decided_by": { "type": "string" }
+                },
+                "additionalProperties": false,
+                "required": ["decision_id", "decision", "decided_by"]
+              }
+            },
+            "action_items": {
+              "type": "array",
+              "description": "Action items. IDs: A-1, A-2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "action_id": { "type": "string", "description": "e.g. A-1, A-2" },
+                  "action": { "type": "string" },
+                  "owner": { "type": "string" },
+                  "due_date": { "type": "string", "format": "date" },
+                  "status": { "type": "string", "enum": ["Open", "In Progress", "Done", "Blocked"] }
+                },
+                "additionalProperties": false,
+                "required": ["action_id", "action", "owner", "due_date", "status"]
+              }
+            },
+            "discussion_highlights": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "topic": { "type": "string" },
+                  "summary": { "type": "string" },
+                  "related_issue_keys": { "type": "array", "items": { "type": "string" } }
+                },
+                "additionalProperties": false,
+                "required": ["topic", "summary", "related_issue_keys"]
+              }
+            },
+            "risks_and_dependencies_summary": { "type": "array", "items": { "type": "string" } },
+            "next_milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "milestone": { "type": "string" },
+                  "target_date": { "type": "string", "format": "date" }
+                },
+                "additionalProperties": false,
+                "required": ["milestone", "target_date"]
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": ["purpose", "key_decisions", "action_items", "discussion_highlights", "risks_and_dependencies_summary", "next_milestones"]
+        },
+        "issue_tracker": {
+          "type": "array",
+          "description": "Unified tracker for all bugs, stories, tasks, and epics. Each issue_key must be unique across the entire array.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "issue_key": { "type": "string", "description": "Unique issue key, e.g. HMC-403. Must be unique across all issue_tracker items." },
+              "issue_type": { "type": "string", "enum": ["Bug", "Story", "Task", "Epic"] },
+              "summary": { "type": "string" },
+              "description": { "type": "string" },
+              "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+              "status": { "type": "string", "enum": ["Open", "To Do", "In Progress", "Done", "Blocked", "Resolved", "Closed"] },
+              "assignee": { "type": "string" },
+              "reporter": { "type": "string" },
+              "sprint": { "type": "string" },
+              "epic": { "type": "string" },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "story_points": { "type": "number" },
+              "blocked_by": { "type": "array", "items": { "type": "string" } },
+              "due_date": { "type": "string", "format": "date" },
+              "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+              "severity": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+              "module": { "type": "string" },
+              "root_cause": { "type": "string" },
+              "steps_to_reproduce": { "type": "array", "items": { "type": "string" } },
+              "impact": { "type": "string" },
+              "workaround": { "type": "string" },
+              "resolution_plan": { "type": "string" },
+              "date_opened": { "type": "string", "format": "date" },
+              "date_resolved": { "type": ["string", "null"], "format": "date" }
+            },
+            "additionalProperties": false,
+            "required": ["issue_key", "issue_type", "summary", "description", "priority", "status", "assignee", "reporter", "sprint", "epic", "labels", "story_points", "blocked_by", "due_date", "acceptance_criteria", "severity", "module", "root_cause", "steps_to_reproduce", "impact", "workaround", "resolution_plan", "date_opened", "date_resolved"]
+          }
+        },
+        "project_plan": {
+          "type": "object",
+          "description": "Project plan. All milestone_ids (M1, M2, …) and all task_ids (T1, T2, …) must be globally unique within project_plan — no two milestones share an ID, no two tasks share an ID regardless of which milestone they belong to.",
+          "properties": {
+            "project_timeline_duration": { "type": "number", "description": "Total project duration in days" },
+            "assumptions": {
+              "type": "object",
+              "properties": {
+                "sprint_duration_weeks": { "type": "number" },
+                "target_ga_date": { "type": "string", "format": "date" }
+              },
+              "additionalProperties": false,
+              "required": ["sprint_duration_weeks", "target_ga_date"]
+            },
+            "milestones": {
+              "type": "array",
+              "description": "Each milestone has a unique milestone_id (M1, M2, …) and contains its own tasks, each with a globally unique task_id (T1, T2, …).",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "milestone_id": {
+                    "type": "string",
+                    "pattern": "^M[0-9]+$",
+                    "description": "Unique milestone identifier across all milestones in this project plan. Format: M1, M2, M3, …"
+                  },
+                  "milestone_timeline_duration": { "type": "number", "description": "Milestone duration in days" },
+                  "title": { "type": "string" },
+                  "start_date": { "type": "string", "format": "date" },
+                  "end_date": { "type": "string", "format": "date" },
+                  "owner": { "type": "string" },
+                  "status": { "type": "string", "enum": ["Not Started", "In Progress", "Completed"] },
+                  "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^M[0-9]+$" }, "description": "milestone_ids this milestone depends on" },
+                  "tasks": {
+                    "type": "array",
+                    "description": "Tasks belonging to this milestone. task_ids must be unique across ALL milestones.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "task_id": {
+                          "type": "string",
+                          "pattern": "^T[0-9]+$",
+                          "description": "Unique task identifier across all tasks in this project plan. Format: T1, T2, T3, … — never reused across milestones."
+                        },
+                        "title": { "type": "string" },
+                        "description": { "type": "string" },
+                        "start_date": { "type": "string", "format": "date" },
+                        "end_date": { "type": "string", "format": "date" },
+                        "duration_days": { "type": "number" },
+                        "owner": { "type": "string" },
+                        "status": { "type": "string", "enum": ["To Do", "In Progress", "Done", "Blocked"] },
+                        "dependency_ids": { "type": "array", "items": { "type": "string", "pattern": "^T[0-9]+$" }, "description": "task_ids this task depends on" },
+                        "comments": { "type": "string" }
+                      },
+                      "additionalProperties": false,
+                      "required": ["task_id", "title", "description", "start_date", "end_date", "duration_days", "owner", "status", "dependency_ids", "comments"]
+                    }
+                  }
+                },
+                "additionalProperties": false,
+                "required": ["milestone_id", "milestone_timeline_duration", "title", "start_date", "end_date", "owner", "status", "dependencies", "tasks"]
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": ["project_timeline_duration", "assumptions", "milestones"]
+        },
+        "raid_log": {
+          "type": "object",
+          "description": "Risks, assumptions, issues, and dependencies. IDs are unique within each sub-list: R1/R2 for risks, A1/A2 for assumptions, I1/I2 for issues, D1/D2 for dependencies.",
+          "properties": {
+            "risks": {
+              "type": "array",
+              "description": "risk_id must be unique across all risks. Format: R1, R2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "risk_id": { "type": "string", "pattern": "^R[0-9]+$", "description": "e.g. R1, R2" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" },
+                  "probability": { "type": "string", "enum": ["Low", "Medium", "High"] },
+                  "impact": { "type": "string", "enum": ["Low", "Medium", "High"] },
+                  "risk_level": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+                  "owner": { "type": "string" },
+                  "identified_date": { "type": "string", "format": "date" },
+                  "mitigation_strategy": { "type": "string" },
+                  "contingency_plan": { "type": "string" },
+                  "status": { "type": "string", "enum": ["Open", "Mitigated", "Closed"] },
+                  "related_tasks": { "type": "array", "items": { "type": "string", "pattern": "^T[0-9]+$" }, "description": "task_ids from project_plan" }
+                },
+                "additionalProperties": false,
+                "required": ["risk_id", "description", "category", "probability", "impact", "risk_level", "owner", "identified_date", "mitigation_strategy", "contingency_plan", "status", "related_tasks"]
+              }
+            },
+            "assumptions": {
+              "type": "array",
+              "description": "assumption_id must be unique across all assumptions. Format: A1, A2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "assumption_id": { "type": "string", "pattern": "^A[0-9]+$", "description": "e.g. A1, A2" },
+                  "description": { "type": "string" },
+                  "owner": { "type": "string" },
+                  "identified_date": { "type": "string", "format": "date" },
+                  "impact_if_invalid": { "type": "string" },
+                  "validation_approach": { "type": "string" },
+                  "status": { "type": "string", "enum": ["Open", "Validated", "Invalid"] }
+                },
+                "additionalProperties": false,
+                "required": ["assumption_id", "description", "owner", "identified_date", "impact_if_invalid", "validation_approach", "status"]
+              }
+            },
+            "issues": {
+              "type": "array",
+              "description": "issue_id must be unique across all RAID issues. Format: I1, I2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "issue_id": { "type": "string", "pattern": "^I[0-9]+$", "description": "e.g. I1, I2" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" },
+                  "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+                  "owner": { "type": "string" },
+                  "identified_date": { "type": "string", "format": "date" },
+                  "impact": { "type": "string" },
+                  "resolution_path": { "type": "string" },
+                  "status": { "type": "string", "enum": ["Open", "In Remediation", "Closed"] },
+                  "related_tasks": { "type": "array", "items": { "type": "string", "pattern": "^T[0-9]+$" }, "description": "task_ids from project_plan" }
+                },
+                "additionalProperties": false,
+                "required": ["issue_id", "description", "category", "priority", "owner", "identified_date", "impact", "resolution_path", "status", "related_tasks"]
+              }
+            },
+            "dependencies": {
+              "type": "array",
+              "description": "dependency_id must be unique across all dependencies. Format: D1, D2, …",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "dependency_id": { "type": "string", "pattern": "^D[0-9]+$", "description": "e.g. D1, D2" },
+                  "description": { "type": "string" },
+                  "type": { "type": "string", "enum": ["Internal", "External"] },
+                  "owner": { "type": "string" },
+                  "provider": { "type": "string" },
+                  "dependent_tasks": { "type": "array", "items": { "type": "string", "pattern": "^T[0-9]+$" }, "description": "task_ids from project_plan" },
+                  "identified_date": { "type": "string", "format": "date" },
+                  "expected_resolution_date": {
+                    "anyOf": [{ "type": "string", "format": "date" }, { "type": "string", "enum": ["Unknown"] }]
+                  },
+                  "status": { "type": "string", "enum": ["Open", "Waiting", "Active", "Completed"] },
+                  "impact_if_delayed": { "type": "string" }
+                },
+                "additionalProperties": false,
+                "required": ["dependency_id", "description", "type", "owner", "provider", "dependent_tasks", "identified_date", "expected_resolution_date", "status", "impact_if_delayed"]
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": ["risks", "assumptions", "issues", "dependencies"]
+        }
+      },
+      "additionalProperties": false,
+      "required": ["metadata", "minutes_of_meeting", "issue_tracker", "project_plan", "raid_log"]
+    }
+  }
