@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import type { ProjectPlanPayload, ProjectPlanMilestone, ProjectPlanTask } from "@/types/meetingPayload";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 
 type Props = {
   plan: ProjectPlanPayload | null;
+  projectTitle?: string;
   isLoading?: boolean;
   isEmpty: boolean;
   embedded?: boolean;
@@ -119,8 +120,14 @@ function TaskRow({ task }: { task: ProjectPlanTask }) {
   );
 }
 
+function milestoneDuration(milestone: ProjectPlanMilestone, agg: MilestoneAggregates | undefined): number {
+  if (agg && agg.totalDuration > 0) return agg.totalDuration;
+  return milestone.milestone_timeline_duration ?? 0;
+}
+
 export function ProjectPlanTable({
   plan,
+  projectTitle,
   isLoading = false,
   isEmpty,
   embedded = false,
@@ -134,6 +141,13 @@ export function ProjectPlanTable({
     }
     return map;
   }, [milestones]);
+
+  const projectTotalDuration = useMemo(() => {
+    return milestones.reduce((sum, m) => {
+      const agg = aggregates.get(m.milestone_id);
+      return sum + milestoneDuration(m, agg);
+    }, 0);
+  }, [milestones, aggregates]);
 
   const milestoneCount = milestones.length;
   const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length ?? 0), 0);
@@ -168,10 +182,31 @@ export function ProjectPlanTable({
           </tr>
         </thead>
         <tbody>
+          <tr className="border-b border-border bg-muted text-foreground">
+            <td className="px-2 py-3 align-middle font-mono text-[11px] font-bold text-foreground">
+              —
+            </td>
+            <td className="px-2 py-3 align-middle">
+              <span className="font-bold text-foreground">
+                {projectTitle?.trim() || "Project"}
+              </span>
+            </td>
+            <td className="max-w-[200px] px-2 py-3 align-middle text-foreground/90">—</td>
+            <td className="px-2 py-3 align-middle text-foreground/90">—</td>
+            <td className="whitespace-nowrap px-2 py-3 align-middle text-foreground/90">—</td>
+            <td className="whitespace-nowrap px-2 py-3 align-middle text-foreground/90">—</td>
+            <td className="px-2 py-3 align-middle font-bold text-foreground">
+              {projectTotalDuration > 0 ? projectTotalDuration : "—"}
+            </td>
+            <td className="px-2 py-3 align-middle font-mono text-[11px] text-foreground/90">—</td>
+            <td className="px-2 py-3 align-middle text-foreground/90">—</td>
+            <td className="px-2 py-3 align-middle text-foreground/90">—</td>
+          </tr>
           {milestones.map(milestone => {
             const agg = aggregates.get(milestone.milestone_id);
+            const days = milestoneDuration(milestone, agg);
             return (
-              <>
+              <Fragment key={milestone.milestone_id}>
                 {/* Milestone header row */}
                 <tr
                   key={`m-${milestone.milestone_id}`}
@@ -198,7 +233,7 @@ export function ProjectPlanTable({
                     {agg?.end || milestone.end_date || "—"}
                   </td>
                   <td className="px-2 py-2.5 align-middle font-medium text-foreground/80">
-                    {agg ? (agg.totalDuration > 0 ? agg.totalDuration : "—") : (milestone.milestone_timeline_duration ?? "—")}
+                    {days > 0 ? days : "—"}
                   </td>
                   <td className="px-2 py-2.5 align-middle font-mono text-[11px] text-muted-foreground">
                     {milestone.dependencies?.join(", ") || "—"}
@@ -216,7 +251,7 @@ export function ProjectPlanTable({
                 {(milestone.tasks ?? []).map(task => (
                   <TaskRow key={`t-${task.task_id}`} task={task} />
                 ))}
-              </>
+              </Fragment>
             );
           })}
         </tbody>

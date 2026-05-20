@@ -48,6 +48,7 @@ export function DashboardTabs({
             <ProjectPlanTable
               embedded
               plan={payload?.project_plan ?? null}
+              projectTitle={payload?.metadata?.meeting_title}
               isLoading={isLoading}
               isEmpty={isEmpty}
             />
