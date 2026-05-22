@@ -165,11 +165,10 @@ export async function updateConfluencePage(
 }
 
 export async function searchJiraUsers(
-  query: string
-): Promise<{ users: Array<{ accountId?: string; displayName?: string }> }> {
-  return backendFetch(
-    `/api/atlassian/jira/users/search?query=${encodeURIComponent(query)}`
-  );
+  query = ""
+): Promise<{ users: Array<{ accountId?: string; displayName?: string; active?: boolean }> }> {
+  const search = query.trim() ? `?query=${encodeURIComponent(query.trim())}` : "";
+  return backendFetch(`/api/atlassian/jira/users/search${search}`);
 }
 
 export async function getIssueTransitions(

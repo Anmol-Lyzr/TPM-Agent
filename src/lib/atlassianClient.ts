@@ -27,6 +27,17 @@ export interface JiraIssuesResponse {
   total?: number;
 }
 
+export interface JiraUser {
+  accountId?: string;
+  displayName?: string;
+  emailAddress?: string;
+  active?: boolean;
+}
+
+export interface JiraUsersResponse {
+  users?: JiraUser[];
+}
+
 export interface JiraComment {
   id: string;
   author?: { displayName?: string };
@@ -91,6 +102,11 @@ export function fetchAtlassianStatus() {
 export function fetchJiraIssues(jql?: string) {
   const query = jql ? `?jql=${encodeURIComponent(jql)}` : "";
   return jsonRequest<JiraIssuesResponse>(`/api/atlassian/jira/issues${query}`);
+}
+
+export function fetchJiraUsers(query?: string) {
+  const search = query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : "";
+  return jsonRequest<JiraUsersResponse>(`/api/atlassian/jira/users/search${search}`);
 }
 
 export function createJiraIssue(params: {

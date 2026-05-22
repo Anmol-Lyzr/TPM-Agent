@@ -12,9 +12,10 @@ import { ProjectAnalyticsSection } from "@/components/dashboard/ProjectAnalytics
 import { DASHBOARD_TABS } from "@/lib/dashboardState";
 import { isBugIssue } from "@/lib/analytics";
 import { postAgent } from "@/lib/agentClient";
+import { buildAssigneeOptions } from "@/lib/assigneeOptions";
 import { formatAtlassianSyncMessage } from "@/lib/atlassian/formatSyncMessage";
 import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
-import { fetchJiraIssues, type JiraIssue } from "@/lib/atlassianClient";
+import { fetchJiraIssues, fetchJiraUsers, type JiraIssue, type JiraUser } from "@/lib/atlassianClient";
 import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
 import { saveSession } from "@/lib/sessionStore";
 import {
@@ -158,8 +159,11 @@ export function DashboardTabs({
   const [refineError, setRefineError] = useState<string | null>(null);
   const [dirtyIssueKeys, setDirtyIssueKeys] = useState<string[]>([]);
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
+  const [jiraUsers, setJiraUsers] = useState<JiraUser[]>([]);
   const [isLoadingJiraIssues, setIsLoadingJiraIssues] = useState(false);
+  const [isLoadingJiraUsers, setIsLoadingJiraUsers] = useState(false);
   const [jiraIssueError, setJiraIssueError] = useState<string | null>(null);
+  const [jiraUserError, setJiraUserError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   const effectivePayload = useMemo(() => {
@@ -178,19 +182,28 @@ export function DashboardTabs({
     if (activeTab !== "issues") return;
     let cancelled = false;
     setIsLoadingJiraIssues(true);
+    setIsLoadingJiraUsers(true);
     setJiraIssueError(null);
-    fetchJiraIssues()
-      .then((data) => {
-        if (!cancelled) setJiraIssues(data.issues ?? []);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setJiraIssueError(err instanceof Error ? err.message : "Failed to load Jira issues");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingJiraIssues(false);
-      });
+    setJiraUserError(null);
+    void Promise.allSettled([fetchJiraIssues(), fetchJiraUsers()]).then(([issuesResult, usersResult]) => {
+      if (cancelled) return;
+      if (issuesResult.status === "fulfilled") {
+        setJiraIssues(issuesResult.value.issues ?? []);
+      } else {
+        setJiraIssueError(
+          issuesResult.reason instanceof Error ? issuesResult.reason.message : "Failed to load Jira issues"
+        );
+      }
+      if (usersResult.status === "fulfilled") {
+        setJiraUsers(usersResult.value.users ?? []);
+      } else {
+        setJiraUserError(
+          usersResult.reason instanceof Error ? usersResult.reason.message : "Failed to load Atlassian users"
+        );
+      }
+      setIsLoadingJiraIssues(false);
+      setIsLoadingJiraUsers(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -352,6 +365,16 @@ export function DashboardTabs({
     for (const dependency of effectivePayload?.raid_log?.dependencies ?? []) add(dependency.owner);
     return [...owners];
   }, [effectivePayload]);
+
+  const issueAssigneeOptions = useMemo(
+    () =>
+      buildAssigneeOptions({
+        atlassianUsers: jiraUsers,
+        fallbackOwners: ownerOptions,
+        currentAssignees: issueRows.map((issue) => issue.assignee),
+      }),
+    [issueRows, jiraUsers, ownerOptions]
+  );
 
   const markDirtyIssues = (
     nextIssues: MeetingMinutesPayload["issue_tracker"],
@@ -769,6 +792,11 @@ export function DashboardTabs({
           Jira issues could not be loaded, showing generated issue tracker rows. {jiraIssueError}
         </div>
       ) : null}
+      {activeTab === "issues" && jiraUserError ? (
+        <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+          Atlassian assignees could not be loaded, showing report owners instead. {jiraUserError}
+        </div>
+      ) : null}
 
       <article className="glass-card relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
         <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -794,10 +822,10 @@ export function DashboardTabs({
             <IssueTracker
               embedded
               issues={filteredIssues}
-              isLoading={isLoading || isLoadingJiraIssues}
+              isLoading={isLoading || isLoadingJiraIssues || isLoadingJiraUsers}
               isEmpty={issuesEmpty && !jiraIssues.length}
               editable={isEditingAll}
-              ownerOptions={ownerOptions}
+              ownerOptions={issueAssigneeOptions}
               onChange={(next) => {
                 markDirtyIssues(next, filteredIssues);
                 setDraftPayload((prev) => (prev ? { ...prev, issue_tracker: next } : prev));

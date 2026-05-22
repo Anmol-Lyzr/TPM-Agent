@@ -49,14 +49,21 @@ function needsResolution(issueKey: string | undefined, projectKey?: string): boo
   return Boolean(key && projectKey?.trim() && !hasProjectPrefix(key, projectKey));
 }
 
-function findPayloadSummary(
+function findPayloadIssueResolution(
   syntheticIssueKey: string,
+  projectKey?: string,
   payload?: MeetingMinutesPayload | null
-): string | undefined {
+): { realKey?: string; summary?: string } {
   const key = syntheticIssueKey.trim().toLowerCase();
-  return payload?.issue_tracker
-    ?.find((issue) => issue.issue_key?.trim().toLowerCase() === key)
-    ?.summary?.trim();
+  const bracketed = `[${key}]`;
+  const issue = payload?.issue_tracker?.find((row) => {
+    const issueKey = row.issue_key?.trim().toLowerCase();
+    const summary = row.summary?.trim().toLowerCase();
+    return issueKey === key || summary?.includes(bracketed) || summary?.includes(key);
+  });
+  if (!issue) return {};
+  const realKey = hasProjectPrefix(issue.issue_key, projectKey) ? issue.issue_key.trim() : undefined;
+  return { realKey, summary: issue.summary?.trim() };
 }
 
 async function buildRealJiraKeyBySummary(projectKey: string): Promise<Map<string, string>> {
@@ -68,6 +75,17 @@ async function buildRealJiraKeyBySummary(projectKey: string): Promise<Map<string
     if (summary && key) map.set(summary, key);
   }
   return map;
+}
+
+function findRealKeyByGeneratedMarker(
+  generatedIssueKey: string,
+  realKeyBySummary?: Map<string, string>
+): string | undefined {
+  const marker = normalizeText(generatedIssueKey);
+  for (const [summary, realKey] of realKeyBySummary ?? []) {
+    if (summary.includes(marker)) return realKey;
+  }
+  return undefined;
 }
 
 async function resolveIssueKey(
@@ -82,8 +100,11 @@ async function resolveIssueKey(
   if (!key) return undefined;
   if (!needsResolution(key, options.projectKey)) return key;
 
-  const summary = findPayloadSummary(key, options.payload);
-  const resolved = summary ? options.realKeyBySummary?.get(normalizeText(summary)) : undefined;
+  const payloadMatch = findPayloadIssueResolution(key, options.projectKey, options.payload);
+  const resolved =
+    payloadMatch.realKey ||
+    (payloadMatch.summary ? options.realKeyBySummary?.get(normalizeText(payloadMatch.summary)) : undefined) ||
+    findRealKeyByGeneratedMarker(key, options.realKeyBySummary);
   if (resolved) {
     console.info(`[cta/jira-actions] resolved issue_key ${key} → ${resolved}`);
     return resolved;

@@ -93,7 +93,7 @@ export function IssueTracker({
               <td className="px-2 py-2.5 text-muted-foreground">
                 {editable ? (
                   <select value={issue.assignee} onChange={(e) => updateIssue(idx, "assignee", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
-                    <option value="">Select owner</option>
+                    <option value="">Select assignee</option>
                     {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
                   </select>
                 ) : (

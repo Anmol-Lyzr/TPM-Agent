@@ -73,6 +73,23 @@ function needsJiraKeyResolution(issueKey: string, projectKey?: string): boolean 
   return Boolean(issueKey.trim() && projectKey?.trim() && !hasProjectPrefix(issueKey, projectKey));
 }
 
+function issueMatchesKeyFilter(
+  issueKey: string,
+  summary: string,
+  keyFilter: Set<string> | null
+): boolean {
+  if (!keyFilter) return true;
+  const normalizedSummary = summary.trim().toLowerCase();
+  for (const filterKey of keyFilter) {
+    const normalizedKey = filterKey.trim().toLowerCase();
+    if (issueKey.trim() === filterKey.trim()) return true;
+    if (normalizedSummary.includes(`[${normalizedKey}]`) || normalizedSummary.includes(normalizedKey)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function buildRealJiraKeyBySummary(projectKey: string): Promise<Map<string, string>> {
   const data = await fetchJiraIssues(`project = ${projectKey} ORDER BY created DESC`);
   const map = new Map<string, string>();
@@ -192,7 +209,7 @@ async function syncJiraIssues(
   const projectKey = status?.jiraProjectKey?.trim();
   const needsLookup = issues.some((issue) => {
     const key = issue.issue_key?.trim() ?? "";
-    if (!key || (keyFilter && !keyFilter.has(key))) return false;
+    if (!key || !issueMatchesKeyFilter(key, issue.summary ?? "", keyFilter)) return false;
     return needsJiraKeyResolution(key, projectKey);
   });
   const realKeyBySummary =
@@ -201,7 +218,7 @@ async function syncJiraIssues(
   for (const issue of issues) {
     const sourceKey = issue.issue_key?.trim() ?? "";
     if (!isValidJiraIssueKey(sourceKey)) continue;
-    if (keyFilter && !keyFilter.has(sourceKey)) continue;
+    if (!issueMatchesKeyFilter(sourceKey, issue.summary ?? "", keyFilter)) continue;
     if (!issueHasSyncableFields(issue)) continue;
 
     try {

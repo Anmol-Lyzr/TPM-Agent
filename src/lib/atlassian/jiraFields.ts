@@ -25,7 +25,12 @@ export async function resolveJiraAccountId(displayName: string): Promise<string>
   if (cached) return cached;
 
   const { users } = await searchJiraUsers(displayName.trim());
-  const accountId = users?.[0]?.accountId;
+  let accountId = users?.find((user) => user.displayName?.trim().toLowerCase() === key)?.accountId;
+  accountId ??= users?.[0]?.accountId;
+  if (!accountId) {
+    const allUsers = await searchJiraUsers();
+    accountId = allUsers.users?.find((user) => user.displayName?.trim().toLowerCase() === key)?.accountId;
+  }
   if (!accountId) throw new Error(`Jira user not found: ${displayName}`);
   accountIdCache.set(key, accountId);
   return accountId;
