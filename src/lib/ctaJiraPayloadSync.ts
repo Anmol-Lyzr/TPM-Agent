@@ -1,37 +1,10 @@
+import {
+  consolidateIssueTracker,
+  issueKeysMatch,
+  resolveTrackerIndexForCta,
+} from "@/lib/issueTrackerMerge";
 import type { CtaJiraAction, ExecuteJiraActionsResult, JiraActionStepResult } from "@/types/jiraActions";
 import type { CallToActionEntry, IssueTrackerEntry, MeetingMinutesPayload } from "@/types/meetingPayload";
-
-function normalizeText(value: string | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function issueKeysMatch(rowKey: string | undefined, targetKey: string | undefined): boolean {
-  const row = rowKey?.trim().toUpperCase();
-  const target = targetKey?.trim().toUpperCase();
-  if (!row || !target) return false;
-  return row === target;
-}
-
-function findTrackerIndex(
-  tracker: IssueTrackerEntry[],
-  issueKey: string | undefined,
-  summaryHint?: string
-): number {
-  const normalizedKey = issueKey?.trim().toUpperCase();
-  const normalizedSummary = normalizeText(summaryHint);
-
-  return tracker.findIndex((row) => {
-    if (issueKeysMatch(row.issue_key, normalizedKey)) return true;
-    if (normalizedSummary && normalizeText(row.summary) === normalizedSummary) return true;
-    if (normalizedKey) {
-      const summary = normalizeText(row.summary);
-      if (summary.includes(`[${normalizedKey.toLowerCase()}]`) || summary.includes(normalizedKey.toLowerCase())) {
-        return true;
-      }
-    }
-    return false;
-  });
-}
 
 function appendJiraComment(description: string, comment: string): string {
   const base = description?.trim() ?? "";
@@ -49,7 +22,7 @@ function applyActionToRow(
   const issueKey = step.issue_key?.trim() || action.issue_key?.trim();
   let next: IssueTrackerEntry = { ...row };
 
-  if (issueKey && issueKeysMatch(row.issue_key, issueKey) === false) {
+  if (issueKey) {
     next = { ...next, issue_key: issueKey };
   }
 
@@ -127,11 +100,7 @@ export function applyCtaJiraResultsToPayload(
           );
     if (!action) continue;
 
-    const idx = findTrackerIndex(
-      tracker,
-      step.issue_key ?? action.issue_key,
-      action.fields?.summary
-    );
+    const idx = resolveTrackerIndexForCta(tracker, action, step, cta);
 
     if (idx >= 0) {
       tracker[idx] = applyActionToRow(tracker[idx], action, step);
@@ -166,7 +135,7 @@ export function applyCtaJiraResultsToPayload(
     }
   }
 
-  return { ...payload, issue_tracker: tracker };
+  return { ...payload, issue_tracker: consolidateIssueTracker(tracker) };
 }
 
 export function extractLatestJiraComment(description: string | undefined): string | null {

@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Clock3, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
-import { postAgent } from "@/lib/agentClient";
+import { postAgentJob, pollAgentJob } from "@/lib/agentClient";
 import { AGENT_ID } from "@/lib/constants";
 import { clearStoredSessionId, generateSessionId, getStoredSessionId, setStoredSessionId } from "@/lib/session";
 import { fetchSession, fetchSessionList, removeSession, type SessionListItem } from "@/lib/sessionStore";
@@ -320,17 +320,22 @@ function SessionViewContent() {
     setNewVersionOpen(false);
 
     try {
-      const data = await postAgent({
+      const { job_id } = await postAgentJob({
         message: trimmed,
         session_id: newSessionId,
         mode: "analyze",
         transcript: trimmed,
         project_name: projectName,
       });
-      setStoredSessionId(data.session_id);
+      const result = await pollAgentJob(job_id);
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Agent job failed");
+      }
+      const sessionId = result.session_id ?? newSessionId;
+      setStoredSessionId(sessionId);
       await refreshList();
       setNewVersionTranscript("");
-      goToIteration(selectedProject.key, data.session_id);
+      goToIteration(selectedProject.key, sessionId);
     } catch (err) {
       setNewVersionError(err instanceof Error ? err.message : "Failed to create new version");
       setNewVersionOpen(true);
@@ -356,18 +361,23 @@ function SessionViewContent() {
     setNewProjectOpen(false);
 
     try {
-      const data = await postAgent({
+      const { job_id } = await postAgentJob({
         message: transcriptInput,
         session_id: newSessionId,
         mode: "analyze",
         transcript: transcriptInput,
         project_name: title,
       });
-      setStoredSessionId(data.session_id);
+      const result = await pollAgentJob(job_id);
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Agent job failed");
+      }
+      const sessionId = result.session_id ?? newSessionId;
+      setStoredSessionId(sessionId);
       await refreshList();
       setNewProjectTitle("");
       setNewProjectTranscript("");
-      goToIteration(normalizeProjectKey(title), data.session_id);
+      goToIteration(normalizeProjectKey(title), sessionId);
     } catch (err) {
       setNewProjectError(err instanceof Error ? err.message : "Failed to create project");
       setNewProjectOpen(true);
@@ -666,6 +676,7 @@ function SessionViewContent() {
                   showEmpty={!hasLoaded && !detailLoading}
                   initialTab={bugsFocus ? "issues" : undefined}
                   issueFilter={bugsFocus ? "bug" : "all"}
+                  onPayloadUpdated={setPayload}
                 />
               </div>
 

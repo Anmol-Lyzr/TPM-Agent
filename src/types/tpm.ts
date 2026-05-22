@@ -18,3 +18,24 @@ export interface AgentApiResponse {
   atlassian_sync?: import("@/lib/sessionStore").AtlassianSyncSummary;
   error?: string;
 }
+
+export interface AgentJobCreateResponse {
+  job_id: string;
+  error?: string;
+}
+
+export type AgentJobStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface AgentJobStatusResponse {
+  job_id: string;
+  status: AgentJobStatus;
+  mode: "analyze" | "refine";
+  session_id?: string;
+  payload?: import("@/types/meetingPayload").MeetingMinutesPayload | null;
+  persisted?: boolean;
+  persist_error?: string;
+  atlassian_sync?: import("@/lib/sessionStore").AtlassianSyncSummary;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
+}

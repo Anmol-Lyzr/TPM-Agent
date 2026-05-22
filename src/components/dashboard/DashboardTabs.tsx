@@ -11,13 +11,14 @@ import { MeetingMinutes } from "@/components/panels/MeetingMinutes";
 import { ProjectAnalyticsSection } from "@/components/dashboard/ProjectAnalyticsSection";
 import { DASHBOARD_TABS } from "@/lib/dashboardState";
 import { isBugIssue } from "@/lib/analytics";
-import { postAgent } from "@/lib/agentClient";
+import { postAgentJob, pollAgentJob } from "@/lib/agentClient";
 import { buildAssigneeOptions } from "@/lib/assigneeOptions";
 import { formatAtlassianSyncMessage } from "@/lib/atlassian/formatSyncMessage";
 import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
 import { fetchJiraIssues, fetchJiraUsers, type JiraIssue, type JiraUser } from "@/lib/atlassianClient";
 import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
 import { applyCtaJiraResultsToPayload } from "@/lib/ctaJiraPayloadSync";
+import { mergeIssueTrackerWithJira } from "@/lib/issueTrackerMerge";
 import { saveSession } from "@/lib/sessionStore";
 import {
   downloadProjectPlanExcel,
@@ -49,89 +50,6 @@ function normalizeText(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function issueKeysMatch(a?: string, b?: string): boolean {
-  const left = a?.trim().toUpperCase();
-  const right = b?.trim().toUpperCase();
-  return Boolean(left && right && left === right);
-}
-
-function toIssueType(value: string | undefined): IssueTrackerEntry["issue_type"] {
-  if (value === "Bug" || value === "Story" || value === "Task" || value === "Epic") return value;
-  return "Task";
-}
-
-function toIssueStatus(value: string | undefined): IssueTrackerEntry["status"] {
-  if (
-    value === "Open" ||
-    value === "To Do" ||
-    value === "In Progress" ||
-    value === "Done" ||
-    value === "Blocked" ||
-    value === "Resolved" ||
-    value === "Closed"
-  ) {
-    return value;
-  }
-  const normalized = normalizeText(value);
-  if (normalized.includes("progress")) return "In Progress";
-  if (normalized.includes("done")) return "Done";
-  if (normalized.includes("closed")) return "Closed";
-  if (normalized.includes("resolved")) return "Resolved";
-  if (normalized.includes("block")) return "Blocked";
-  if (normalized.includes("to do") || normalized.includes("todo") || normalized.includes("backlog")) {
-    return "To Do";
-  }
-  return "Open";
-}
-
-function toIssuePriority(value: string | undefined): IssueTrackerEntry["priority"] {
-  if (value === "Low" || value === "Medium" || value === "High" || value === "Critical") return value;
-  const normalized = normalizeText(value);
-  if (normalized.includes("highest") || normalized.includes("critical")) return "Critical";
-  if (normalized.includes("high")) return "High";
-  if (normalized.includes("low")) return "Low";
-  return "Medium";
-}
-
-function jiraIssueToTrackerEntry(
-  issue: JiraIssue,
-  generatedIssues: IssueTrackerEntry[]
-): IssueTrackerEntry {
-  const summary = issue.fields?.summary?.trim() ?? "";
-  const generated = generatedIssues.find(
-    (row) =>
-      normalizeText(row.summary) === normalizeText(summary) ||
-      issueKeysMatch(row.issue_key, issue.key)
-  );
-  const priority = toIssuePriority(issue.fields?.priority?.name ?? generated?.priority);
-  return {
-    issue_key: issue.key,
-    issue_type: toIssueType(issue.fields?.issuetype?.name ?? generated?.issue_type),
-    summary: summary || generated?.summary || "Untitled Jira issue",
-    description: generated?.description ?? "",
-    priority,
-    status: toIssueStatus(issue.fields?.status?.name ?? generated?.status),
-    assignee: issue.fields?.assignee?.displayName ?? generated?.assignee ?? "",
-    reporter: generated?.reporter ?? "",
-    sprint: generated?.sprint ?? "",
-    epic: generated?.epic ?? "",
-    labels: generated?.labels ?? [],
-    story_points: generated?.story_points ?? 0,
-    blocked_by: generated?.blocked_by ?? [],
-    due_date: generated?.due_date ?? "",
-    acceptance_criteria: generated?.acceptance_criteria ?? [],
-    severity: generated?.severity ?? priority,
-    module: generated?.module ?? "",
-    root_cause: generated?.root_cause ?? "",
-    steps_to_reproduce: generated?.steps_to_reproduce ?? [],
-    impact: generated?.impact ?? "",
-    workaround: generated?.workaround ?? "",
-    resolution_plan: generated?.resolution_plan ?? "",
-    date_opened: generated?.date_opened ?? "",
-    date_resolved: generated?.date_resolved ?? null,
-  };
-}
-
 export function DashboardTabs({
   payload,
   isLoading,
@@ -139,6 +57,7 @@ export function DashboardTabs({
   showEmpty,
   sessionId,
   onRefine: _onRefine,
+  onPayloadUpdated,
   initialTab,
   issueFilter = "all",
 }: {
@@ -148,6 +67,7 @@ export function DashboardTabs({
   showEmpty: boolean;
   sessionId: string | null;
   onRefine?: (prompt: string, activeTab: DashboardTabId, snapshot: unknown) => Promise<void>;
+  onPayloadUpdated?: (payload: MeetingMinutesPayload) => void;
   initialTab?: DashboardTabId;
   issueFilter?: "all" | "bug";
 }) {
@@ -227,8 +147,7 @@ export function DashboardTabs({
 
   const issueRows = useMemo(() => {
     const generatedIssues = effectivePayload?.issue_tracker ?? [];
-    if (!jiraIssues.length) return generatedIssues;
-    return jiraIssues.map((issue) => jiraIssueToTrackerEntry(issue, generatedIssues));
+    return mergeIssueTrackerWithJira(generatedIssues, jiraIssues);
   }, [effectivePayload, jiraIssues]);
 
   const filteredIssues = useMemo(() => {
@@ -310,8 +229,10 @@ export function DashboardTabs({
       { payload: updatedPayload },
       { skipAtlassianSync: true }
     );
-    setDraftPayload(saved.payload ?? updatedPayload);
+    const nextPayload = saved.payload ?? updatedPayload;
+    setDraftPayload(nextPayload);
     setStatusOverrides((prev) => ({ ...prev, [ctaId]: status }));
+    onPayloadUpdated?.(nextPayload);
   };
 
   const handleCtaDecision = async (
@@ -350,9 +271,7 @@ export function DashboardTabs({
         }
         const payloadWithJira = applyCtaJiraResultsToPayload(draftPayload, cta, exec);
         await persistCtaStatus(ctaId, "Executed", payloadWithJira);
-        if (activeTab === "issues") {
-          await reloadJiraData();
-        }
+        void reloadJiraData();
         setSaveNotice(
           `CTA executed in Jira (${exec.steps.map((s) => s.operation).join(" → ")}). Issue tracker updated.`
         );
@@ -464,7 +383,7 @@ export function DashboardTabs({
     setIsRefining(true);
     setRefineError(null);
     try {
-      const response = await postAgent({
+      const { job_id } = await postAgentJob({
         mode: "refine",
         session_id: sessionId,
         message: feedbackText.trim(),
@@ -472,19 +391,23 @@ export function DashboardTabs({
         current_payload: effectivePayload,
         project_name: effectivePayload.metadata?.meeting_title?.trim() || undefined,
       });
-      if (!response.payload) {
+      const result = await pollAgentJob(job_id);
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Feedback agent job failed");
+      }
+      if (!result.payload) {
         throw new Error("Feedback agent did not return an updated payload");
       }
-      setDraftPayload(response.payload);
+      setDraftPayload(result.payload);
       setStatusOverrides({});
       setIsDirty(false);
       setFeedbackText("");
       setExpandedCategory(null);
       setExpandedCtaId(null);
       setCtaError(null);
-      const syncMsg = formatAtlassianSyncMessage(response.atlassian_sync);
+      const syncMsg = formatAtlassianSyncMessage(result.atlassian_sync);
       if (syncMsg) {
-        if (response.atlassian_sync?.ok) setSaveNotice(syncMsg);
+        if (result.atlassian_sync?.ok) setSaveNotice(syncMsg);
         else setRefineError(`Report updated. ${syncMsg}`);
       }
     } catch (err) {
