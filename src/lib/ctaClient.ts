@@ -1,6 +1,17 @@
 import type { CallToActionEntry } from "@/types/meetingPayload";
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 import type { ExecuteJiraActionsResult } from "@/types/jiraActions";
+import type { CtaAggregateRow } from "@/lib/db/sessions";
+
+export async function fetchBulkCtas(): Promise<CtaAggregateRow[]> {
+  const res = await fetch("/api/cta/bulk");
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `Failed to load CTAs (${res.status})`);
+  }
+  const data = (await res.json()) as { items: CtaAggregateRow[] };
+  return data.items ?? [];
+}
 
 export async function executeCtaJiraActionsForCta(
   cta: CallToActionEntry,

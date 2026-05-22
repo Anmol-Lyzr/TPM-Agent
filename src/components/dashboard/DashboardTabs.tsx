@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Loader2, Pencil, Save, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Download, Loader2, Pencil, Save, Sparkles, X } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { ProjectPlanTable } from "@/components/panels/ProjectPlanTable";
@@ -17,6 +17,12 @@ import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
 import { fetchJiraIssues, type JiraIssue } from "@/lib/atlassianClient";
 import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
 import { saveSession } from "@/lib/sessionStore";
+import {
+  downloadProjectPlanExcel,
+  downloadIssueTrackerExcel,
+  downloadRaidLogExcel,
+  downloadMomDocx,
+} from "@/lib/downloadUtils";
 import type { CallToActionEntry, IssueTrackerEntry } from "@/types/meetingPayload";
 import type { DashboardTabId } from "@/types/tpm";
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
@@ -154,6 +160,7 @@ export function DashboardTabs({
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
   const [isLoadingJiraIssues, setIsLoadingJiraIssues] = useState(false);
   const [jiraIssueError, setJiraIssueError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const effectivePayload = useMemo(() => {
     if (!draftPayload) return null;
@@ -439,6 +446,36 @@ export function DashboardTabs({
     }
   };
 
+  const handleDownload = async () => {
+    if (!effectivePayload || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const projectTitle = effectivePayload.metadata?.meeting_title;
+      if (activeTab === "plan") {
+        downloadProjectPlanExcel(effectivePayload.project_plan, projectTitle);
+      } else if (activeTab === "issues") {
+        downloadIssueTrackerExcel(filteredIssues, projectTitle);
+      } else if (activeTab === "raid") {
+        downloadRaidLogExcel(effectivePayload.raid_log, projectTitle);
+      } else if (activeTab === "mom") {
+        await downloadMomDocx(
+          effectivePayload.minutes_of_meeting,
+          effectivePayload.metadata ?? null,
+          projectTitle
+        );
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const downloadLabel: Record<DashboardTabId, string> = {
+    plan: "Download Excel",
+    issues: "Download Excel",
+    raid: "Download Excel",
+    mom: "Download DOCX",
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {effectivePayload ? (
@@ -667,38 +704,55 @@ export function DashboardTabs({
           active={activeTab}
           onChange={(key) => setActiveTab(key as DashboardTabId)}
         />
-        {sessionId ? (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {effectivePayload ? (
             <button
               type="button"
-              onClick={() => setIsEditingAll((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+              disabled={isDownloading}
+              onClick={() => void handleDownload()}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              {isEditingAll ? "Done" : "Edit"}
-            </button>
-            <button
-              type="button"
-              disabled={!isDirty || isSavingPayload}
-              onClick={() => void handleSavePayload()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-br from-primary to-[#A65A2C] px-2.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {isSavingPayload ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {dirtyIssueKeys.length || activeTab === "issues" ? "Syncing to Jira..." : "Saving..."}
-                </>
+              {isDownloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <>
-                  <Save className="h-3.5 w-3.5" />
-                  {dirtyIssueKeys.length || activeTab === "issues"
-                    ? "Save & sync to Jira"
-                    : "Save changes"}
-                </>
+                <Download className="h-3.5 w-3.5" />
               )}
+              {downloadLabel[activeTab]}
             </button>
-          </div>
-        ) : null}
+          ) : null}
+          {sessionId ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsEditingAll((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {isEditingAll ? "Done" : "Edit"}
+              </button>
+              <button
+                type="button"
+                disabled={!isDirty || isSavingPayload}
+                onClick={() => void handleSavePayload()}
+                className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-br from-primary to-[#A65A2C] px-2.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {isSavingPayload ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {dirtyIssueKeys.length || activeTab === "issues" ? "Syncing to Jira..." : "Saving..."}
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5" />
+                    {dirtyIssueKeys.length || activeTab === "issues"
+                      ? "Save & sync to Jira"
+                      : "Save changes"}
+                  </>
+                )}
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
       {saveNotice ? (
         <div className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-foreground">

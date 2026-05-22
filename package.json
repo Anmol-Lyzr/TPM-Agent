@@ -24,6 +24,7 @@
         "@tabler/icons-react": "^3.44.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "docx": "^9.6.1",
         "framer-motion": "^12.39.0",
         "lucide-react": "^0.511.0",
         "mongodb": "^7.2.0",

@@ -9,6 +9,7 @@ import {
   IconPlugConnected,
   IconBook,
   IconSitemap,
+  IconRobot,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/ui/nav-main"
@@ -36,6 +37,16 @@ const data = {
     { title: "Dashboard", url: "/", icon: IconDashboard },
     { title: "Agent Console", url: "/console", icon: IconMessages },
     { title: "Projects", url: "/session", icon: IconFolderOpen },
+    {
+      title: "Agents",
+      url: "/agents",
+      icon: IconRobot,
+      defaultExpanded: true,
+      subItems: [
+        { title: "Escalation Agent", url: "/agents/escalation" },
+        { title: "Accountability Agent", url: "/agents/accountability" },
+      ],
+    },
   ],
   navTools: [
     {

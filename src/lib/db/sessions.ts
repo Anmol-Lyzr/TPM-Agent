@@ -1,6 +1,6 @@
 import { getDb, resetMongoClient } from "@/lib/db/mongodb";
 import { sanitizeForMongo } from "@/lib/db/sanitize";
-import type { MeetingMinutesPayload } from "@/types/meetingPayload";
+import type { CallToActionEntry, MeetingMinutesPayload } from "@/types/meetingPayload";
 
 const COLLECTION = "sessions";
 let indexesEnsured = false;
@@ -142,4 +142,58 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
   const db = await getDb();
   const result = await db.collection(COLLECTION).deleteOne({ sessionId });
   return result.deletedCount > 0;
+}
+
+export interface CtaAggregateRow {
+  sessionId: string;
+  projectTitle: string;
+  projectKey: string;
+  cta: CallToActionEntry;
+}
+
+export async function listCtaAggregates(): Promise<CtaAggregateRow[]> {
+  await ensureIndexes();
+  const db = await getDb();
+  const docs = await db
+    .collection<TpmSessionDocument>(COLLECTION)
+    .find(
+      { "payload.call_to_actions.0": { $exists: true } },
+      {
+        projection: {
+          sessionId: 1,
+          projectName: 1,
+          transcript: 1,
+          "payload.metadata": 1,
+          "payload.call_to_actions": 1,
+        },
+      }
+    )
+    .sort({ updatedAt: -1 })
+    .limit(500)
+    .toArray();
+
+  const rows: CtaAggregateRow[] = [];
+  for (const doc of docs) {
+    const projectTitle = deriveTitle(doc);
+    const projectKey =
+      normalizeExplicitProjectName(doc.projectName) ?? doc.sessionId;
+    for (const raw of doc.payload?.call_to_actions ?? []) {
+      if (!raw?.cta_id) continue;
+      const cta: CallToActionEntry = {
+        ...raw,
+        action_when_approved: Array.isArray(raw.action_when_approved)
+          ? raw.action_when_approved
+          : [String(raw.action_when_approved ?? "").trim()].filter(Boolean),
+        jira_actions: Array.isArray(raw.jira_actions) ? raw.jira_actions : [],
+        status: raw.status ?? "Pending",
+      };
+      rows.push({
+        sessionId: doc.sessionId,
+        projectTitle,
+        projectKey,
+        cta,
+      });
+    }
+  }
+  return rows;
 }

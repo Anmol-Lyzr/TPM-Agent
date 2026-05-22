@@ -24,12 +24,16 @@ interface NavItem {
   title: string
   url: string
   icon?: NavIcon
+  defaultExpanded?: boolean
   subItems?: { title: string; url: string; icon?: NavIcon }[]
 }
 
 function NavItemWithSub({ item, pathname }: { item: NavItem; pathname: string }) {
-  const isParentActive = pathname === item.url || pathname.startsWith(item.url + "/")
-  const [open, setOpen] = useState(isParentActive)
+  const isParentActive =
+    pathname === item.url ||
+    pathname.startsWith(item.url + "/") ||
+    (item.url === "/agents" && pathname.startsWith("/agents"))
+  const [open, setOpen] = useState(item.defaultExpanded ?? isParentActive)
 
   useEffect(() => {
     if (isParentActive) setOpen(true)
