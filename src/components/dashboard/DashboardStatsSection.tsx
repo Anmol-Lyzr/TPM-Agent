@@ -5,9 +5,8 @@ import Link from "next/link";
 import {
   ArrowRight,
   Bug,
-  CheckCircle2,
   FolderKanban,
-  ListTodo,
+  CalendarDays,
   Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -27,11 +26,15 @@ function StatCard({
   label,
   value,
   hint,
+  ctaLabel,
+  href,
   icon: Icon,
 }: {
   label: string;
   value: string | number;
   hint: string;
+  ctaLabel: string;
+  href: string;
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
@@ -44,20 +47,27 @@ function StatCard({
       </div>
       <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
       <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>
+      <Link
+        href={href}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+      >
+        {ctaLabel}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
     </motion.div>
   );
 }
 
-/** Analytics, quick start, and session overview — shown below the dashboard chat hero. */
+/** Meeting analytics overview shown below the dashboard chat hero. */
 export function DashboardStatsSection() {
   const { analytics, ready, error } = useDashboardAnalytics();
   const display = (n: number) => (ready ? n : "—");
 
   return (
-    <div className="pt-4 border-t border-black/[0.06]">
+    <div className="pt-4 border-t border-black/6">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-semibold text-foreground">Meeting analytics</h2>
+        <h2 className="text-sm font-semibold text-foreground">Project analytics</h2>
         <span className="text-[9px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
           {ready ? analytics.totalSessions : "—"} sessions
         </span>
@@ -75,86 +85,26 @@ export function DashboardStatsSection() {
           label="Overall projects"
           value={display(analytics.overallProjects)}
           hint="Meetings with analyzed output"
+          ctaLabel="Open project list"
+          href="/session"
           icon={FolderKanban}
         />
         <StatCard
           label="Total bugs"
           value={display(analytics.totalBugs)}
-          hint="Bug-type Jira issues (deduped by key)"
+          hint="Bug-type Jira issues across all meetings"
+          ctaLabel="Review bug issues"
+          href="/session?focus=bugs"
           icon={Bug}
         />
         <StatCard
-          label="Completed projects"
-          value={display(analytics.completedProjects)}
-          hint="Sessions with plan, issues, RAID log, or MoM"
-          icon={CheckCircle2}
+          label="Weekly connects"
+          value={display(analytics.totalSessions)}
+          hint="Saved meeting sessions available for follow-up"
+          ctaLabel="Open all connects"
+          href="/session"
+          icon={CalendarDays}
         />
-      </motion.div>
-
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 lg:grid-cols-3"
-      >
-        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden lg:col-span-2">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Across all sessions</h3>
-          </div>
-          <div className="p-5">
-            <p className="text-sm text-muted-foreground mb-4">
-              {ready ? (
-                <>
-                  {analytics.totalSessions === 0
-                    ? "No sessions yet. Start in the workspace with a meeting transcript."
-                    : `${analytics.totalSessions} workspace session${analytics.totalSessions === 1 ? "" : "s"} stored — ${analytics.overallProjects} with analyzed meeting output.`}
-                </>
-              ) : (
-                "Loading session analytics…"
-              )}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/workspace"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-primary to-[#A65A2C] text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all shadow-sm"
-              >
-                <Sparkles className="h-4 w-4" />
-                Open workspace
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/session"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] text-sm font-medium text-foreground hover:bg-black/[0.07] transition-colors"
-              >
-                Browse sessions
-              </Link>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div variants={itemVariants} className="glass-card rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-black/[0.05]">
-            <ListTodo className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Quick start</h3>
-          </div>
-          <motion.div className="p-5">
-            <ol className="space-y-3">
-              {[
-                "Open the workspace and paste a transcript",
-                "Run Analyze Meeting to generate outputs",
-                "Edit, export, or refine with AI per tab",
-              ].map((step, i) => (
-                <li key={i} className="flex gap-2.5 items-start">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                    {i + 1}
-                  </span>
-                  <span className="text-sm text-muted-foreground">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </motion.div>
-        </motion.div>
       </motion.div>
     </div>
   );

@@ -3,10 +3,10 @@
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-export type AppNavId = "dashboard" | "workspace" | "session";
+export type AppNavId = "dashboard" | "session";
 
 export function AppShell({
   leftPanel,
@@ -16,9 +16,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const activeNav: AppNavId = pathname.startsWith("/workspace")
-    ? "workspace"
-    : pathname.startsWith("/session")
+  const activeNav: AppNavId = pathname.startsWith("/session")
       ? "session"
       : "dashboard";
 
@@ -38,12 +36,6 @@ export function AppShell({
             active={activeNav === "dashboard"}
             icon={LayoutDashboard}
             label="Dashboard"
-          />
-          <RailLink
-            href="/workspace"
-            active={activeNav === "workspace"}
-            icon={Sparkles}
-            label="Workspace"
           />
           <RailLink
             href="/session"

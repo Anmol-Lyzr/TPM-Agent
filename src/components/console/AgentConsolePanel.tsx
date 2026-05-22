@@ -270,10 +270,10 @@ export function AgentConsolePanel() {
           ) : sessions.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No saved meetings yet.{" "}
-              <Link href="/workspace" className="text-primary hover:underline">
-                Analyze a transcript
+              <Link href="/session" className="text-primary hover:underline">
+                Create a new project
               </Link>{" "}
-              in Workspace first.
+              to start.
             </p>
           ) : (
             <ul className="max-h-[280px] space-y-1 overflow-y-auto">

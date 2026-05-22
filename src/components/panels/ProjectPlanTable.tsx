@@ -3,7 +3,6 @@
 import { Fragment, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import type { ProjectPlanPayload, ProjectPlanMilestone, ProjectPlanTask } from "@/types/meetingPayload";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -15,6 +14,9 @@ type Props = {
   isLoading?: boolean;
   isEmpty: boolean;
   embedded?: boolean;
+  editable?: boolean;
+  ownerOptions?: string[];
+  onChange?: (next: ProjectPlanPayload) => void;
 };
 
 interface MilestoneAggregates {
@@ -79,47 +81,6 @@ function computeMilestoneAggregates(milestone: ProjectPlanMilestone): MilestoneA
   };
 }
 
-function statusBadgeVariant(status: string): "success" | "warning" | "danger" | "default" {
-  const s = status.toLowerCase();
-  if (s === "completed" || s === "done") return "success";
-  if (s === "in progress") return "warning";
-  if (s === "blocked") return "danger";
-  return "default";
-}
-
-function TaskRow({ task }: { task: ProjectPlanTask }) {
-  return (
-    <tr className="border-b border-border/20 hover:bg-black/[0.02]">
-      <td className="px-2 py-2 pl-8 align-top font-mono text-[11px] text-muted-foreground">
-        {task.task_id || "—"}
-      </td>
-      <td className="px-2 py-2 align-top text-foreground">
-        <span className="pl-1">{task.title || "—"}</span>
-      </td>
-      <td className="max-w-[200px] px-2 py-2 align-top text-muted-foreground text-xs">
-        {task.description || "—"}
-      </td>
-      <td className="px-2 py-2 align-top text-muted-foreground">{task.owner || "—"}</td>
-      <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{task.start_date || "—"}</td>
-      <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{task.end_date || "—"}</td>
-      <td className="px-2 py-2 align-top text-muted-foreground">{task.duration_days ?? "—"}</td>
-      <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">
-        {task.dependency_ids?.join(", ") || "—"}
-      </td>
-      <td className="px-2 py-2 align-top">
-        {task.status ? (
-          <Badge variant={statusBadgeVariant(task.status)}>{task.status}</Badge>
-        ) : (
-          "—"
-        )}
-      </td>
-      <td className="max-w-[160px] px-2 py-2 align-top text-muted-foreground">
-        {task.comments || "—"}
-      </td>
-    </tr>
-  );
-}
-
 function milestoneDuration(milestone: ProjectPlanMilestone, agg: MilestoneAggregates | undefined): number {
   if (agg && agg.totalDuration > 0) return agg.totalDuration;
   return milestone.milestone_timeline_duration ?? 0;
@@ -131,6 +92,9 @@ export function ProjectPlanTable({
   isLoading = false,
   isEmpty,
   embedded = false,
+  editable = false,
+  ownerOptions = [],
+  onChange,
 }: Props) {
   const milestones = plan?.milestones ?? [];
 
@@ -151,6 +115,50 @@ export function ProjectPlanTable({
 
   const milestoneCount = milestones.length;
   const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length ?? 0), 0);
+
+  const updateTask = (
+    milestoneIdx: number,
+    taskIdx: number,
+    key: keyof ProjectPlanTask,
+    value: string
+  ) => {
+    if (!plan || !onChange) return;
+    const next: ProjectPlanPayload = {
+      ...plan,
+      milestones: plan.milestones.map((m, mi) =>
+        mi !== milestoneIdx
+          ? m
+          : {
+              ...m,
+              tasks: m.tasks.map((t, ti) => {
+                if (ti !== taskIdx) return t;
+                if (key === "duration_days") return { ...t, duration_days: Number(value) || 0 };
+                if (key === "dependency_ids") return { ...t, dependency_ids: value.split(",").map((v) => v.trim()).filter(Boolean) };
+                return { ...t, [key]: value };
+              }),
+            }
+      ),
+    };
+    onChange(next);
+  };
+
+  const updateMilestone = (
+    milestoneIdx: number,
+    key: keyof ProjectPlanMilestone,
+    value: string
+  ) => {
+    if (!plan || !onChange) return;
+    const next: ProjectPlanPayload = {
+      ...plan,
+      milestones: plan.milestones.map((m, mi) => {
+        if (mi !== milestoneIdx) return m;
+        if (key === "milestone_timeline_duration") return { ...m, milestone_timeline_duration: Number(value) || 0 };
+        if (key === "dependencies") return { ...m, dependencies: value.split(",").map((v) => v.trim()).filter(Boolean) };
+        return { ...m, [key]: value };
+      }),
+    };
+    onChange(next);
+  };
 
   const content = isEmpty || milestones.length === 0 ? (
     <EmptyState
@@ -202,7 +210,7 @@ export function ProjectPlanTable({
             <td className="px-2 py-3 align-middle text-foreground/90">—</td>
             <td className="px-2 py-3 align-middle text-foreground/90">—</td>
           </tr>
-          {milestones.map(milestone => {
+          {milestones.map((milestone, mi) => {
             const agg = aggregates.get(milestone.milestone_id);
             const days = milestoneDuration(milestone, agg);
             return (
@@ -216,40 +224,125 @@ export function ProjectPlanTable({
                     {milestone.milestone_id || "—"}
                   </td>
                   <td className="px-2 py-2.5 align-middle">
-                    <span className="font-semibold text-foreground">
-                      {milestone.title || "—"}
-                    </span>
+                    {editable ? (
+                      <input
+                        value={milestone.title}
+                        onChange={(e) => updateMilestone(mi, "title", e.target.value)}
+                        className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      <span className="font-semibold text-foreground">{milestone.title || "—"}</span>
+                    )}
                   </td>
                   <td className="max-w-[200px] px-2 py-2.5 align-middle text-muted-foreground">
                     —
                   </td>
                   <td className="px-2 py-2.5 align-middle text-muted-foreground">
-                    {milestone.owner || "—"}
+                    {editable ? (
+                      <select
+                        value={milestone.owner}
+                        onChange={(e) => updateMilestone(mi, "owner", e.target.value)}
+                        className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      >
+                        <option value="">Select owner</option>
+                        {ownerOptions.map((owner) => (
+                          <option key={owner} value={owner}>{owner}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      milestone.owner || "—"
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-foreground/80">
-                    {agg?.start || milestone.start_date || "—"}
+                    {editable ? (
+                      <input
+                        type="date"
+                        value={milestone.start_date}
+                        onChange={(e) => updateMilestone(mi, "start_date", e.target.value)}
+                        className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      agg?.start || milestone.start_date || "—"
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-2.5 align-middle font-medium text-foreground/80">
-                    {agg?.end || milestone.end_date || "—"}
+                    {editable ? (
+                      <input
+                        type="date"
+                        value={milestone.end_date}
+                        onChange={(e) => updateMilestone(mi, "end_date", e.target.value)}
+                        className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      agg?.end || milestone.end_date || "—"
+                    )}
                   </td>
                   <td className="px-2 py-2.5 align-middle font-medium text-foreground/80">
                     {days > 0 ? days : "—"}
                   </td>
                   <td className="px-2 py-2.5 align-middle font-mono text-[11px] text-muted-foreground">
-                    {milestone.dependencies?.join(", ") || "—"}
+                    {editable ? (
+                      <input
+                        value={milestone.dependencies?.join(", ") ?? ""}
+                        onChange={(e) => updateMilestone(mi, "dependencies", e.target.value)}
+                        className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      milestone.dependencies?.join(", ") || "—"
+                    )}
                   </td>
                   <td className="px-2 py-2.5 align-middle">
-                    {agg?.status ? (
-                      <Badge variant={statusBadgeVariant(agg.status)}>{agg.status}</Badge>
-                    ) : milestone.status ? (
-                      <Badge variant={statusBadgeVariant(milestone.status)}>{milestone.status}</Badge>
-                    ) : "—"}
+                    {editable ? (
+                      <select
+                        value={milestone.status}
+                        onChange={(e) => updateMilestone(mi, "status", e.target.value)}
+                        className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs"
+                      >
+                        <option>Not Started</option>
+                        <option>In Progress</option>
+                        <option>Completed</option>
+                      </select>
+                    ) : (
+                      milestone.status || "—"
+                    )}
                   </td>
                   <td className="px-2 py-2.5 align-middle text-muted-foreground">—</td>
                 </tr>
                 {/* Task rows */}
-                {(milestone.tasks ?? []).map(task => (
-                  <TaskRow key={`t-${task.task_id}`} task={task} />
+                {(milestone.tasks ?? []).map((task, ti) => (
+                  <tr key={`t-${task.task_id}`} className="border-b border-border/20 hover:bg-black/[0.02]">
+                    <td className="px-2 py-2 pl-8 align-top font-mono text-[11px] text-muted-foreground">{task.task_id || "—"}</td>
+                    <td className="px-2 py-2 align-top text-foreground">
+                      {editable ? (
+                        <input value={task.title} onChange={(e) => updateTask(mi, ti, "title", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" />
+                      ) : task.title || "—"}
+                    </td>
+                    <td className="max-w-[200px] px-2 py-2 align-top text-muted-foreground text-xs">
+                      {editable ? (
+                        <input value={task.description} onChange={(e) => updateTask(mi, ti, "description", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" />
+                      ) : task.description || "—"}
+                    </td>
+                    <td className="px-2 py-2 align-top text-muted-foreground">
+                      {editable ? (
+                        <select value={task.owner} onChange={(e) => updateTask(mi, ti, "owner", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                          <option value="">Select owner</option>
+                          {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+                        </select>
+                      ) : task.owner || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{editable ? <input type="date" value={task.start_date} onChange={(e) => updateTask(mi, ti, "start_date", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : task.start_date || "—"}</td>
+                    <td className="whitespace-nowrap px-2 py-2 align-top text-muted-foreground">{editable ? <input type="date" value={task.end_date} onChange={(e) => updateTask(mi, ti, "end_date", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : task.end_date || "—"}</td>
+                    <td className="px-2 py-2 align-top text-muted-foreground">{editable ? <input type="number" value={task.duration_days} onChange={(e) => updateTask(mi, ti, "duration_days", e.target.value)} className="w-20 rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : task.duration_days ?? "—"}</td>
+                    <td className="px-2 py-2 align-top font-mono text-[11px] text-muted-foreground">{editable ? <input value={task.dependency_ids?.join(", ") ?? ""} onChange={(e) => updateTask(mi, ti, "dependency_ids", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : task.dependency_ids?.join(", ") || "—"}</td>
+                    <td className="px-2 py-2 align-top">
+                      {editable ? (
+                        <select value={task.status} onChange={(e) => updateTask(mi, ti, "status", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                          <option>To Do</option><option>In Progress</option><option>Done</option><option>Blocked</option>
+                        </select>
+                      ) : task.status || "—"}
+                    </td>
+                    <td className="max-w-[160px] px-2 py-2 align-top text-muted-foreground">{editable ? <input value={task.comments} onChange={(e) => updateTask(mi, ti, "comments", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : task.comments || "—"}</td>
+                  </tr>
                 ))}
               </Fragment>
             );

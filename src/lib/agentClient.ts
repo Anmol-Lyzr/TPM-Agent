@@ -5,6 +5,9 @@ export async function postAgent(body: {
   session_id?: string;
   mode?: "analyze" | "refine";
   transcript?: string;
+  project_name?: string;
+  feedback_text?: string;
+  current_payload?: import("@/types/meetingPayload").MeetingMinutesPayload | null;
 }): Promise<AgentApiResponse> {
   const res = await fetch("/api/agent", {
     method: "POST",

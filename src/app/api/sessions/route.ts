@@ -9,6 +9,7 @@ export async function GET() {
     return NextResponse.json({
       sessions: sessions.map((s) => ({
         sessionId: s.sessionId,
+        projectName: s.projectName,
         title: s.title,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,

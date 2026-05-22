@@ -10,12 +10,16 @@ export async function GET() {
     const db = await getDb();
     const docs = await db
       .collection<TpmSessionDocument>("sessions")
-      .find({}, { projection: { payload: 1 } })
+      .find({}, { projection: { sessionId: 1, projectName: 1, payload: 1 } })
       .limit(200)
       .toArray();
 
     const analytics = computeDashboardAnalytics(
-      docs.map(d => ({ payload: d.payload ?? null }))
+      docs.map(d => ({
+        sessionId: d.sessionId,
+        projectName: d.projectName,
+        payload: d.payload ?? null,
+      }))
     );
 
     return NextResponse.json({

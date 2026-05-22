@@ -4,6 +4,7 @@ import {
   getSession,
   upsertSession,
 } from "@/lib/db/sessions";
+import { runSessionAtlassianSync } from "@/lib/atlassian/runSessionSync";
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
 export const runtime = "nodejs";
@@ -24,8 +25,10 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
     return NextResponse.json({
       sessionId: doc.sessionId,
+      projectName: doc.projectName,
       payload: doc.payload,
       transcript: doc.transcript,
+      confluencePageId: doc.confluencePageId,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });
@@ -47,24 +50,57 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     const transcript =
       typeof body.transcript === "string" ? body.transcript : undefined;
+    const projectName =
+      typeof body.projectName === "string" ? body.projectName.trim() || undefined : undefined;
+    const skipAtlassianSync = body.skipAtlassianSync === true;
+    const syncIssueKeys = Array.isArray(body.syncIssueKeys)
+      ? body.syncIssueKeys.filter((k: unknown) => typeof k === "string" && k.trim())
+      : undefined;
 
     let doc;
     try {
       doc = await upsertSession(sessionId.trim(), {
         payload: payload ?? null,
         transcript,
+        projectName,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       return NextResponse.json({ error: message }, { status: 500 });
     }
 
+    let atlassianSync;
+    if (payload && !skipAtlassianSync) {
+      try {
+        atlassianSync = await runSessionAtlassianSync(sessionId.trim(), payload, "user_edit", {
+          confluencePageId: doc.confluencePageId,
+          syncIssueKeys,
+          skipConfluence: Boolean(syncIssueKeys?.length),
+        });
+      } catch (err) {
+        atlassianSync = {
+          ok: false,
+          configured: false,
+          skipped: true,
+          trigger: "user_edit" as const,
+          jira: { updated: [], failed: [] },
+          confluence: {},
+          errors: [err instanceof Error ? err.message : "Atlassian sync failed"],
+        };
+      }
+    }
+
+    const latest = await getSession(sessionId.trim());
+
     return NextResponse.json({
       sessionId: doc.sessionId,
-      payload: doc.payload,
-      transcript: doc.transcript,
+      projectName: latest?.projectName ?? doc.projectName,
+      payload: latest?.payload ?? doc.payload,
+      transcript: latest?.transcript ?? doc.transcript,
+      confluencePageId: latest?.confluencePageId,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
+      atlassian_sync: atlassianSync,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

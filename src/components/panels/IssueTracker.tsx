@@ -2,7 +2,6 @@
 
 import { Bug } from "lucide-react";
 import type { IssueTrackerEntry } from "@/types/meetingPayload";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -12,20 +11,33 @@ type Props = {
   isLoading?: boolean;
   isEmpty: boolean;
   embedded?: boolean;
+  editable?: boolean;
+  ownerOptions?: string[];
+  onChange?: (next: IssueTrackerEntry[]) => void;
 };
-
-function issueTypeBadgeVariant(issueType: string): "danger" | "warning" | "default" {
-  if (/bug|defect/i.test(issueType)) return "danger";
-  if (/epic/i.test(issueType)) return "warning";
-  return "default";
-}
 
 export function IssueTracker({
   issues,
   isLoading = false,
   isEmpty,
   embedded = false,
+  editable = false,
+  ownerOptions = [],
+  onChange,
 }: Props) {
+  const updateIssue = (idx: number, key: keyof IssueTrackerEntry, value: string) => {
+    if (!onChange) return;
+    const next = issues.map((issue, i) => {
+      if (i !== idx) return issue;
+      if (key === "labels" || key === "blocked_by" || key === "acceptance_criteria" || key === "steps_to_reproduce") {
+        return { ...issue, [key]: value.split(",").map((v) => v.trim()).filter(Boolean) } as IssueTrackerEntry;
+      }
+      if (key === "story_points") return { ...issue, story_points: Number(value) || 0 };
+      return { ...issue, [key]: value } as IssueTrackerEntry;
+    });
+    onChange(next);
+  };
+
   const content = isEmpty ? (
     <EmptyState
       icon={Bug}
@@ -54,35 +66,64 @@ export function IssueTracker({
                 {issue.issue_key || "—"}
               </td>
               <td className="px-2 py-2.5">
-                {issue.issue_type ? (
-                  <Badge variant={issueTypeBadgeVariant(issue.issue_type)}>
-                    {issue.issue_type}
-                  </Badge>
+                {editable ? (
+                  <select value={issue.issue_type} onChange={(e) => updateIssue(idx, "issue_type", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option>Bug</option><option>Story</option><option>Task</option><option>Epic</option>
+                  </select>
                 ) : (
-                  "—"
+                  issue.issue_type || "—"
                 )}
               </td>
               <td className="max-w-[180px] px-2 py-2.5 text-foreground">
-                {issue.summary || "—"}
+                {editable ? (
+                  <input value={issue.summary} onChange={(e) => updateIssue(idx, "summary", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" />
+                ) : (
+                  issue.summary || "—"
+                )}
               </td>
               <td className="px-2 py-2.5">
-                {issue.status ? (
-                  <Badge variant="unknown">{issue.status}</Badge>
+                {editable ? (
+                  <select value={issue.status} onChange={(e) => updateIssue(idx, "status", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option>Open</option><option>To Do</option><option>In Progress</option><option>Done</option><option>Blocked</option><option>Resolved</option><option>Closed</option>
+                  </select>
                 ) : (
-                  "—"
+                  issue.status || "—"
                 )}
               </td>
               <td className="px-2 py-2.5 text-muted-foreground">
-                {issue.assignee || "—"}
+                {editable ? (
+                  <select value={issue.assignee} onChange={(e) => updateIssue(idx, "assignee", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option value="">Select owner</option>
+                    {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+                  </select>
+                ) : (
+                  issue.assignee || "—"
+                )}
               </td>
               <td className="px-2 py-2.5 text-muted-foreground">
-                {issue.due_date || "—"}
+                {editable ? (
+                  <input type="date" value={issue.due_date} onChange={(e) => updateIssue(idx, "due_date", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" />
+                ) : (
+                  issue.due_date || "—"
+                )}
               </td>
               <td className="px-2 py-2.5 text-muted-foreground">
-                {issue.priority || "—"}
+                {editable ? (
+                  <select value={issue.priority} onChange={(e) => updateIssue(idx, "priority", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+                  </select>
+                ) : (
+                  issue.priority || "—"
+                )}
               </td>
               <td className="px-2 py-2.5 text-muted-foreground">
-                {issue.severity || "—"}
+                {editable ? (
+                  <select value={issue.severity} onChange={(e) => updateIssue(idx, "severity", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+                  </select>
+                ) : (
+                  issue.severity || "—"
+                )}
               </td>
             </tr>
           ))}

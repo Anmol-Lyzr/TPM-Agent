@@ -1,23 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { Check, ChevronDown, ChevronUp, Loader2, Pencil, Save, Sparkles, X } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { ProjectPlanTable } from "@/components/panels/ProjectPlanTable";
 import { IssueTracker } from "@/components/panels/IssueTracker";
 import { RaidLogPanel } from "@/components/panels/RaidLogPanel";
 import { MeetingMinutes } from "@/components/panels/MeetingMinutes";
+import { ProjectAnalyticsSection } from "@/components/dashboard/ProjectAnalyticsSection";
 import { DASHBOARD_TABS } from "@/lib/dashboardState";
+import { isBugIssue } from "@/lib/analytics";
+import { postAgent } from "@/lib/agentClient";
+import { formatAtlassianSyncMessage } from "@/lib/atlassian/formatSyncMessage";
+import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
+import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
+import { saveSession } from "@/lib/sessionStore";
+import type { CallToActionEntry } from "@/types/meetingPayload";
 import type { DashboardTabId } from "@/types/tpm";
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
+
+type CtaStatus = "Pending" | "Approved" | "Executed" | "Dismissed";
+type CtaCategory =
+  | "Blockers & Escalations"
+  | "Deadline & Schedule Alerts"
+  | "Accountability & Ownership"
+  | "Meeting & MoM Follow-ups"
+  | "Health & Progress Anomalies";
+
+const CTA_CATEGORIES: CtaCategory[] = [
+  "Blockers & Escalations",
+  "Deadline & Schedule Alerts",
+  "Accountability & Ownership",
+  "Meeting & MoM Follow-ups",
+  "Health & Progress Anomalies",
+];
 
 export function DashboardTabs({
   payload,
   isLoading,
-  hasRun,
+  hasRun: _hasRun,
   showEmpty,
   sessionId,
-  onRefine,
+  onRefine: _onRefine,
+  initialTab,
+  issueFilter = "all",
 }: {
   payload: MeetingMinutesPayload | null;
   isLoading: boolean;
@@ -25,20 +52,553 @@ export function DashboardTabs({
   showEmpty: boolean;
   sessionId: string | null;
   onRefine?: (prompt: string, activeTab: DashboardTabId, snapshot: unknown) => Promise<void>;
+  initialTab?: DashboardTabId;
+  issueFilter?: "all" | "bug";
 }) {
-  const [activeTab, setActiveTab] = useState<DashboardTabId>("plan");
+  void _hasRun;
+  void _onRefine;
+  const [activeTab, setActiveTab] = useState<DashboardTabId>(initialTab ?? "plan");
+  const [draftPayload, setDraftPayload] = useState<MeetingMinutesPayload | null>(payload);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSavingPayload, setIsSavingPayload] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [isEditingAll, setIsEditingAll] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<CtaCategory | null>(null);
+  const [expandedCtaId, setExpandedCtaId] = useState<string | null>(null);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, CtaStatus>>({});
+  const [ctaSavingId, setCtaSavingId] = useState<string | null>(null);
+  const [ctaError, setCtaError] = useState<string | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [dirtyIssueKeys, setDirtyIssueKeys] = useState<string[]>([]);
+
+  const effectivePayload = useMemo(() => {
+    if (!draftPayload) return null;
+    if (!draftPayload.call_to_actions?.length) return draftPayload;
+    return {
+      ...draftPayload,
+      call_to_actions: draftPayload.call_to_actions.map((cta) => ({
+        ...cta,
+        status: statusOverrides[cta.cta_id] ?? cta.status,
+      })),
+    };
+  }, [draftPayload, statusOverrides]);
+
+  const filteredIssues = useMemo(() => {
+    const issues = effectivePayload?.issue_tracker ?? [];
+    if (issueFilter !== "bug") return issues;
+    return issues.filter((issue) => isBugIssue(issue.issue_type));
+  }, [effectivePayload, issueFilter]);
 
   const isEmpty = showEmpty || !payload;
+  const issuesEmpty = isEmpty || filteredIssues.length === 0;
+  const callToActions = useMemo(
+    () =>
+      (effectivePayload?.call_to_actions ?? []).map((cta) => ({
+        ...cta,
+        category: CTA_CATEGORIES.includes(cta.category as CtaCategory)
+          ? (cta.category as CtaCategory)
+          : "Meeting & MoM Follow-ups",
+        action_when_approved: Array.isArray(cta.action_when_approved)
+          ? cta.action_when_approved
+          : [String(cta.action_when_approved ?? "").trim()].filter(Boolean),
+        jira_actions: Array.isArray(cta.jira_actions) ? cta.jira_actions : [],
+        status: statusOverrides[cta.cta_id] ?? cta.status ?? "Pending",
+      })),
+    [effectivePayload, statusOverrides]
+  );
+
+  const callToActionsByCategory = useMemo(
+    () =>
+      CTA_CATEGORIES.map((category) => ({
+        category,
+        actions: callToActions.filter((cta) => cta.category === category),
+      })),
+    [callToActions]
+  );
+
+  const toggleCategory = (category: CtaCategory) => {
+    setExpandedCategory((prev) => {
+      const isClosing = prev === category;
+      if (isClosing) setExpandedCtaId(null);
+      return isClosing ? null : category;
+    });
+    setCtaError(null);
+  };
+
+  const toggleCta = (ctaId: string) => {
+    setExpandedCtaId((prev) => (prev === ctaId ? null : ctaId));
+    setCtaError(null);
+  };
+
+  const priorityClass = (priority: string) => {
+    if (priority === "Critical") return "bg-destructive text-destructive-foreground";
+    if (priority === "High") return "bg-destructive/75 text-destructive-foreground";
+    if (priority === "Medium") return "bg-amber-500/80 text-white";
+    return "bg-muted text-muted-foreground";
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === "Executed") return "Executed";
+    if (status === "Approved") return "Approved";
+    if (status === "Dismissed") return "Rejected";
+    return "Pending";
+  };
+
+  const persistCtaStatus = async (ctaId: string, status: CallToActionEntry["status"]) => {
+    if (!sessionId || !draftPayload) return;
+    const updatedPayload: MeetingMinutesPayload = {
+      ...draftPayload,
+      call_to_actions: (draftPayload.call_to_actions ?? []).map((cta) =>
+        cta.cta_id === ctaId ? { ...cta, status } : cta
+      ),
+    };
+    const saved = await saveSession(
+      sessionId,
+      { payload: updatedPayload },
+      { skipAtlassianSync: true }
+    );
+    setDraftPayload(saved.payload ?? updatedPayload);
+    setStatusOverrides((prev) => ({ ...prev, [ctaId]: status }));
+  };
+
+  const handleCtaDecision = async (
+    ctaId: string,
+    decision: "approve" | "reject"
+  ) => {
+    if (!draftPayload) return;
+    const cta = callToActions.find((item) => item.cta_id === ctaId);
+    if (!cta) return;
+
+    setCtaSavingId(ctaId);
+    setCtaError(null);
+
+    try {
+      if (decision === "reject") {
+        await persistCtaStatus(ctaId, "Dismissed");
+        setExpandedCtaId(null);
+        return;
+      }
+
+      const jiraActions = cta.jira_actions ?? [];
+      if (jiraActions.length > 0) {
+        const exec = await executeCtaJiraActionsForCta(cta);
+        if (!exec.ok) {
+          setStatusOverrides((prev) => {
+            const copy = { ...prev };
+            delete copy[ctaId];
+            return copy;
+          });
+          setCtaError(
+            exec.errors.length
+              ? exec.errors.join("; ")
+              : "Jira actions failed. CTA remains pending — retry after fixing."
+          );
+          return;
+        }
+        await persistCtaStatus(ctaId, "Executed");
+        setSaveNotice(
+          `CTA executed in Jira (${exec.steps.map((s) => s.operation).join(" → ")})`
+        );
+      } else {
+        await persistCtaStatus(ctaId, "Executed");
+      }
+      setExpandedCtaId(null);
+    } catch (err) {
+      setStatusOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[ctaId];
+        return copy;
+      });
+      setCtaError(err instanceof Error ? err.message : "Failed to update CTA");
+    } finally {
+      setCtaSavingId(null);
+    }
+  };
+
+  const ownerOptions = useMemo(() => {
+    const owners = new Set<string>();
+    const add = (v?: string) => {
+      const value = (v ?? "").trim();
+      if (value) owners.add(value);
+    };
+    for (const milestone of effectivePayload?.project_plan?.milestones ?? []) {
+      add(milestone.owner);
+      for (const task of milestone.tasks ?? []) add(task.owner);
+    }
+    for (const issue of effectivePayload?.issue_tracker ?? []) add(issue.assignee);
+    for (const action of effectivePayload?.minutes_of_meeting?.action_items ?? []) add(action.owner);
+    for (const risk of effectivePayload?.raid_log?.risks ?? []) add(risk.owner);
+    for (const assumption of effectivePayload?.raid_log?.assumptions ?? []) add(assumption.owner);
+    for (const issue of effectivePayload?.raid_log?.issues ?? []) add(issue.owner);
+    for (const dependency of effectivePayload?.raid_log?.dependencies ?? []) add(dependency.owner);
+    return [...owners];
+  }, [effectivePayload]);
+
+  const markDirtyIssues = (nextIssues: MeetingMinutesPayload["issue_tracker"]) => {
+    const prev = draftPayload?.issue_tracker ?? [];
+    const changed: string[] = [];
+    for (const issue of nextIssues) {
+      const key = issue.issue_key?.trim();
+      if (!key) continue;
+      const before = prev.find((row) => row.issue_key === key);
+      if (!before || JSON.stringify(before) !== JSON.stringify(issue)) {
+        changed.push(key);
+      }
+    }
+    if (changed.length) {
+      setDirtyIssueKeys((keys) => [...new Set([...keys, ...changed])]);
+    }
+  };
+
+  const handleSavePayload = async () => {
+    if (!effectivePayload || !sessionId || !isDirty) return;
+    setIsSavingPayload(true);
+    setSaveError(null);
+    setSaveNotice(null);
+
+    const syncIssueKeys =
+      dirtyIssueKeys.length > 0
+        ? dirtyIssueKeys
+        : activeTab === "issues"
+          ? (effectivePayload.issue_tracker ?? [])
+              .map((i) => i.issue_key?.trim())
+              .filter((k): k is string => Boolean(k && isValidJiraIssueKey(k)))
+          : undefined;
+
+    try {
+      const saved = await saveSession(
+        sessionId,
+        { payload: effectivePayload },
+        { syncIssueKeys }
+      );
+      setDraftPayload(saved.payload ?? effectivePayload);
+      setIsDirty(false);
+      setDirtyIssueKeys([]);
+      setStatusOverrides({});
+
+      const sync = saved.atlassian_sync;
+      if (sync?.errors?.length) {
+        setSaveError(`Saved in app. ${sync.errors.join("; ")}`);
+      } else {
+        const syncMsg = formatAtlassianSyncMessage(sync);
+        if (syncMsg) setSaveNotice(syncMsg);
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setIsSavingPayload(false);
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!sessionId || !effectivePayload || !feedbackText.trim()) return;
+    setIsRefining(true);
+    setRefineError(null);
+    try {
+      const response = await postAgent({
+        mode: "refine",
+        session_id: sessionId,
+        message: feedbackText.trim(),
+        feedback_text: feedbackText.trim(),
+        current_payload: effectivePayload,
+        project_name: effectivePayload.metadata?.meeting_title?.trim() || undefined,
+      });
+      if (!response.payload) {
+        throw new Error("Feedback agent did not return an updated payload");
+      }
+      setDraftPayload(response.payload);
+      setStatusOverrides({});
+      setIsDirty(false);
+      setFeedbackText("");
+      setExpandedCategory(null);
+      setExpandedCtaId(null);
+      setCtaError(null);
+      const syncMsg = formatAtlassianSyncMessage(response.atlassian_sync);
+      if (syncMsg) {
+        if (response.atlassian_sync?.ok) setSaveNotice(syncMsg);
+        else setRefineError(`Report updated. ${syncMsg}`);
+      }
+    } catch (err) {
+      setRefineError(err instanceof Error ? err.message : "Failed to refine report");
+    } finally {
+      setIsRefining(false);
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {effectivePayload ? (
+        <section className="glass-card rounded-xl p-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Feedback Refinement
+              </p>
+              <p className="mt-1 text-base font-semibold text-foreground">
+                Improve this report using stakeholder feedback.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add your feedback to regenerate the current version with the latest updates, action status changes, and refined recommendations.
+              </p>
+            </div>
+            <div>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Enter feedback for the feedback agent..."
+                disabled={isRefining}
+                className="min-h-[92px] w-full rounded-lg border border-border/50 bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={isRefining || !feedbackText.trim()}
+                  onClick={() => void handleFeedbackSubmit()}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-br from-primary to-[#A65A2C] px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  {isRefining ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Submit feedback"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+          {refineError ? (
+            <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs text-destructive">
+              {refineError}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {callToActions.length > 0 ? (
+        <section className="glass-card rounded-xl p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <p className="text-sm font-semibold text-foreground">Recommended actions</p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {callToActionsByCategory.map(({ category, actions }) => {
+              const expanded = expandedCategory === category;
+              return (
+                <Fragment key={category}>
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(category)}
+                    className="rounded-lg border border-border/50 bg-background/70 p-3 text-left transition-colors hover:bg-black/2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-foreground">{category}</p>
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {actions.length} action{actions.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{actions.length ? "Click to view actions" : "No actions in this category"}</span>
+                      <span className="inline-flex items-center gap-1">
+                        {expanded ? (
+                          <>
+                            Collapse
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </>
+                        ) : (
+                          <>
+                            Expand
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </button>
+                  {expanded ? (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 md:col-span-3">
+                      {actions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          This category currently has no recommended actions.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                          {actions.map((cta) => {
+                            const ctaExpanded = expandedCtaId === cta.cta_id;
+                            const completed =
+                              cta.status === "Executed" || cta.status === "Dismissed";
+                            return (
+                              <Fragment key={cta.cta_id}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCta(cta.cta_id)}
+                                  className="rounded-lg border border-border/50 bg-background/70 px-4 py-3 text-left transition-colors hover:bg-black/2"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="line-clamp-1 text-sm font-semibold text-foreground">{cta.title}</p>
+                                    <span
+                                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${priorityClass(
+                                        cta.priority
+                                      )}`}
+                                    >
+                                      {cta.priority}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                                    <span className={completed ? "text-success font-medium" : ""}>
+                                      {statusLabel(cta.status)}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                      {ctaExpanded ? (
+                                        <>
+                                          Collapse
+                                          <ChevronUp className="h-3.5 w-3.5" />
+                                        </>
+                                      ) : (
+                                        <>
+                                          Expand
+                                          <ChevronDown className="h-3.5 w-3.5" />
+                                        </>
+                                      )}
+                                    </span>
+                                  </div>
+                                </button>
+                                {ctaExpanded ? (
+                                  <div className="rounded-md border border-border/40 bg-background/60 px-4 py-3 md:col-span-3">
+                                    <p className="text-xs text-muted-foreground">{cta.description}</p>
+                                    <p className="mt-2 text-xs font-medium text-foreground">Impact</p>
+                                    <p className="text-xs text-muted-foreground">{cta.impact}</p>
+                                    <p className="mt-2 text-xs font-medium text-foreground">Action when approved</p>
+                                    <ul className="mt-1 space-y-1 pl-4 text-xs text-muted-foreground">
+                                      {(cta.action_when_approved ?? []).map((step, index) => (
+                                        <li key={`${cta.cta_id}-step-${index}`} className="list-disc">
+                                          {step}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                    {(cta.jira_actions?.length ?? 0) > 0 ? (
+                                      <p className="mt-2 text-[11px] text-muted-foreground">
+                                        {cta.jira_actions!.length} Jira operation
+                                        {cta.jira_actions!.length === 1 ? "" : "s"} will run on Accept via TPM
+                                        backend.
+                                      </p>
+                                    ) : null}
+                                    <div className="mt-3 flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={ctaSavingId === cta.cta_id}
+                                        onClick={() => void handleCtaDecision(cta.cta_id, "reject")}
+                                        className="inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                        Reject
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={ctaSavingId === cta.cta_id || completed}
+                                        onClick={() => void handleCtaDecision(cta.cta_id, "approve")}
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-br from-primary to-[#A65A2C] px-2.5 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                                      >
+                                        {ctaSavingId === cta.cta_id ? (
+                                          <>
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Check className="h-3.5 w-3.5" />
+                                            Accept
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </Fragment>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedCategory(null);
+                            setExpandedCtaId(null);
+                          }}
+                          className="inline-flex items-center rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+                        >
+                          Close category
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </div>
+          {ctaError ? (
+            <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs text-destructive">
+              {ctaError}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <ProjectAnalyticsSection payload={payload} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           tabs={DASHBOARD_TABS}
           active={activeTab}
           onChange={(key) => setActiveTab(key as DashboardTabId)}
         />
+        {sessionId ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditingAll((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {isEditingAll ? "Done" : "Edit"}
+            </button>
+            <button
+              type="button"
+              disabled={!isDirty || isSavingPayload}
+              onClick={() => void handleSavePayload()}
+              className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-br from-primary to-[#A65A2C] px-2.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {isSavingPayload ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {dirtyIssueKeys.length || activeTab === "issues" ? "Syncing to Jira..." : "Saving..."}
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5" />
+                  {dirtyIssueKeys.length || activeTab === "issues"
+                    ? "Save & sync to Jira"
+                    : "Save changes"}
+                </>
+              )}
+            </button>
+          </div>
+        ) : null}
       </div>
+      {saveNotice ? (
+        <div className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-foreground">
+          {saveNotice}
+        </div>
+      ) : null}
+      {saveError ? (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {saveError}
+        </div>
+      ) : null}
 
       <article className="glass-card relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
         <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -47,38 +607,71 @@ export function DashboardTabs({
           {activeTab === "plan" ? (
             <ProjectPlanTable
               embedded
-              plan={payload?.project_plan ?? null}
-              projectTitle={payload?.metadata?.meeting_title}
+              plan={draftPayload?.project_plan ?? null}
+              projectTitle={draftPayload?.metadata?.meeting_title}
               isLoading={isLoading}
               isEmpty={isEmpty}
+              editable={isEditingAll}
+              ownerOptions={ownerOptions}
+              onChange={(next) => {
+                setDraftPayload((prev) => (prev ? { ...prev, project_plan: next } : prev));
+                setIsDirty(true);
+              }}
             />
           ) : null}
 
           {activeTab === "issues" ? (
             <IssueTracker
               embedded
-              issues={payload?.issue_tracker ?? []}
+              issues={filteredIssues}
               isLoading={isLoading}
-              isEmpty={isEmpty}
+              isEmpty={issuesEmpty}
+              editable={isEditingAll}
+              ownerOptions={ownerOptions}
+              onChange={(next) => {
+                markDirtyIssues(next);
+                setDraftPayload((prev) => (prev ? { ...prev, issue_tracker: next } : prev));
+                setIsDirty(true);
+              }}
             />
           ) : null}
 
           {activeTab === "raid" ? (
             <RaidLogPanel
               embedded
-              raid={payload?.raid_log ?? null}
+              raid={draftPayload?.raid_log ?? null}
               isLoading={isLoading}
               isEmpty={isEmpty}
+              editable={isEditingAll}
+              ownerOptions={ownerOptions}
+              onChange={(next) => {
+                setDraftPayload((prev) => (prev ? { ...prev, raid_log: next } : prev));
+                setIsDirty(true);
+              }}
             />
           ) : null}
 
           {activeTab === "mom" ? (
             <MeetingMinutes
               embedded
-              minutes={payload?.minutes_of_meeting ?? null}
-              metadata={payload?.metadata ?? null}
+              minutes={draftPayload?.minutes_of_meeting ?? null}
+              metadata={draftPayload?.metadata ?? null}
               isLoading={isLoading}
               isEmpty={isEmpty}
+              editable={isEditingAll}
+              ownerOptions={ownerOptions}
+              onChange={(nextMinutes, nextMetadata) => {
+                setDraftPayload((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        minutes_of_meeting: nextMinutes,
+                        metadata: nextMetadata ?? prev.metadata,
+                      }
+                    : prev
+                );
+                setIsDirty(true);
+              }}
             />
           ) : null}
         </div>

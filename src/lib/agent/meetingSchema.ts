@@ -185,6 +185,82 @@ const RaidLogPayloadSchema = z.object({
   dependencies: z.array(RaidDependencySchema),
 });
 
+const JiraActionFieldsSchema = z.object({
+  summary: z.string(),
+  description: z.string(),
+  issuetype: z.string(),
+  priority: z.string(),
+  assignee: z.string(),
+  reporter: z.string(),
+  labels: z.array(z.string()),
+  duedate: z.string(),
+  parent_key: z.string(),
+  epic_link: z.string(),
+  story_points: z.number(),
+  components: z.array(z.string()),
+  fix_versions: z.array(z.string()),
+});
+
+const CtaJiraActionSchema = z.object({
+  operation: z.enum([
+    "create_issue",
+    "update_issue",
+    "transition_status",
+    "add_comment",
+    "assign_user",
+    "link_issues",
+  ]),
+  project_key: z.string(),
+  issue_key: z.string(),
+  fields: JiraActionFieldsSchema,
+  transition_name: z.string(),
+  comment_body: z.string(),
+  link_type: z.string(),
+  linked_issue_key: z.string(),
+});
+
+const CallToActionSchema = z.object({
+  cta_id: z.string(),
+  category: z.enum([
+    "Blockers & Escalations",
+    "Deadline & Schedule Alerts",
+    "Accountability & Ownership",
+    "Meeting & MoM Follow-ups",
+    "Health & Progress Anomalies",
+  ]),
+  title: z.string(),
+  description: z.string(),
+  impact: z.string(),
+  action_when_approved: z.array(z.string()),
+  suggestion_prompt: z.string(),
+  target_recipient: z.string(),
+  target_channel: z.enum([
+    "Email",
+    "Slack",
+    "Jira Comment",
+    "Calendar Invite",
+    "Confluence Page",
+    "Other",
+  ]),
+  priority: z.enum(["Low", "Medium", "High", "Critical"]),
+  related_entity: z.object({
+    entity_type: z.enum([
+      "action_item",
+      "key_decision",
+      "issue",
+      "risk",
+      "assumption",
+      "dependency",
+      "milestone",
+      "task",
+      "none",
+    ]),
+    entity_id: z.string(),
+  }),
+  status: z.enum(["Pending", "Approved", "Executed", "Dismissed"]),
+  jira_actions: z.array(CtaJiraActionSchema).default([]),
+});
+
 // ── top-level schema ──────────────────────────────────────────────────────────
 
 export const MeetingMinutesPayloadSchema = z.object({
@@ -193,6 +269,7 @@ export const MeetingMinutesPayloadSchema = z.object({
   issue_tracker: z.array(IssueTrackerEntrySchema),
   project_plan: ProjectPlanPayloadSchema,
   raid_log: RaidLogPayloadSchema,
+  call_to_actions: z.array(CallToActionSchema).optional(),
 });
 
 export type MeetingMinutesPayloadParsed = z.infer<

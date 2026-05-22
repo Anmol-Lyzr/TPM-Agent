@@ -1,14 +1,27 @@
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
+export interface AtlassianSyncSummary {
+  ok: boolean;
+  configured: boolean;
+  skipped: boolean;
+  errors: string[];
+  jira?: { updated: string[]; failed: Array<{ issueKey: string; error: string }> };
+  confluence?: { pageId?: string; action?: string; error?: string };
+}
+
 export interface SessionData {
   payload: MeetingMinutesPayload | null;
+  projectName?: string;
   transcript?: string;
+  confluencePageId?: string;
   createdAt?: string;
   updatedAt?: string;
+  atlassian_sync?: AtlassianSyncSummary;
 }
 
 export interface SessionListItem {
   sessionId: string;
+  projectName?: string;
   title: string;
   createdAt?: string;
   updatedAt?: string;
@@ -57,22 +70,39 @@ export async function fetchSession(sessionId: string): Promise<SessionData | nul
   const data = (await res.json()) as SessionData & { sessionId: string; createdAt?: string | Date; updatedAt?: string | Date };
   return {
     payload: data.payload ?? null,
+    projectName: data.projectName,
     transcript: data.transcript,
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
   };
 }
 
-export async function saveSession(sessionId: string, data: SessionData): Promise<void> {
+export type SaveSessionOptions = {
+  /** Only sync these Jira keys to Atlassian (Issue Tracker row edits). */
+  syncIssueKeys?: string[];
+  /** Persist Mongo only — used after CTA already ran jira_actions. */
+  skipAtlassianSync?: boolean;
+};
+
+export async function saveSession(
+  sessionId: string,
+  data: SessionData,
+  options?: SaveSessionOptions
+): Promise<SessionData & { sessionId: string }> {
   const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      syncIssueKeys: options?.syncIssueKeys,
+      skipAtlassianSync: options?.skipAtlassianSync,
+    }),
   });
   if (!res.ok) {
     const body = (await res.json()) as { error?: string };
     throw new Error(body.error ?? `Failed to save session (${res.status})`);
   }
+  return (await res.json()) as SessionData & { sessionId: string };
 }
 
 export async function removeSession(sessionId: string): Promise<void> {

@@ -72,7 +72,7 @@ export const TPM_SKILLS: TpmSkill[] = [
       "Ingest MS Teams transcripts and run the Lyzr agent to produce all four output sections in one pass.",
     integrations: ["Lyzr", "Composio"],
     steps: 4,
-    href: "/workspace",
+    href: "/session",
   },
   {
     id: "project-plan",
@@ -83,7 +83,7 @@ export const TPM_SKILLS: TpmSkill[] = [
       "Parse Smartsheet tables with WBS 0 overall timeline, milestone rows (M1…), task rows, and duration (days) from dates or cells.",
     integrations: ["Smartsheet export"],
     steps: 5,
-    href: "/workspace",
+    href: "/session",
   },
   {
     id: "issue-tracker",
@@ -94,7 +94,7 @@ export const TPM_SKILLS: TpmSkill[] = [
       "Extract Jira keys, bug vs task types, assignees, and due dates — keeps defects out of the project plan.",
     integrations: ["Jira", "Composio"],
     steps: 3,
-    href: "/workspace",
+    href: "/session",
   },
   {
     id: "raid-log",
@@ -105,7 +105,7 @@ export const TPM_SKILLS: TpmSkill[] = [
       "Build RAID entries from agent RAID section plus MoM risks, assumptions, and open questions.",
     integrations: ["Confluence"],
     steps: 4,
-    href: "/workspace",
+    href: "/session",
   },
   {
     id: "meeting-minutes",
@@ -116,7 +116,7 @@ export const TPM_SKILLS: TpmSkill[] = [
       "Structured MoM: title, attendees, summary, decisions, action items, risks — with Confluence link when created.",
     integrations: ["Confluence", "Composio"],
     steps: 6,
-    href: "/workspace",
+    href: "/session",
   },
   {
     id: "agent-console",

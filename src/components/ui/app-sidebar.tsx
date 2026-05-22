@@ -4,7 +4,6 @@ import * as React from "react"
 import {
   IconDashboard,
   IconMessages,
-  IconTerminal2,
   IconFolderOpen,
   IconSettings,
   IconPlugConnected,
@@ -35,7 +34,6 @@ const data = {
   },
   navMain: [
     { title: "Dashboard", url: "/", icon: IconDashboard },
-    { title: "Workspace", url: "/workspace", icon: IconTerminal2 },
     { title: "Agent Console", url: "/console", icon: IconMessages },
     { title: "Projects", url: "/session", icon: IconFolderOpen },
   ],

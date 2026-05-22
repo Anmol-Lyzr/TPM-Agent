@@ -1,5 +1,7 @@
 /** Agent structured output — Meeting Minutes and Project Tracking Schema (output.json). */
 
+import type { CtaJiraAction } from "@/types/jiraActions";
+
 // ── metadata ─────────────────────────────────────────────────────────────────
 
 export interface MeetingPilotInstallation {
@@ -187,6 +189,41 @@ export interface RaidLogPayload {
   dependencies: RaidDependency[];
 }
 
+export interface CallToActionRelatedEntity {
+  entity_type:
+    | "action_item"
+    | "key_decision"
+    | "issue"
+    | "risk"
+    | "assumption"
+    | "dependency"
+    | "milestone"
+    | "task"
+    | "none";
+  entity_id: string;
+}
+
+export interface CallToActionEntry {
+  cta_id: string;
+  category:
+    | "Blockers & Escalations"
+    | "Deadline & Schedule Alerts"
+    | "Accountability & Ownership"
+    | "Meeting & MoM Follow-ups"
+    | "Health & Progress Anomalies";
+  title: string;
+  description: string;
+  impact: string;
+  action_when_approved: string[];
+  suggestion_prompt: string;
+  target_recipient: string;
+  target_channel: "Email" | "Slack" | "Jira Comment" | "Calendar Invite" | "Confluence Page" | "Other";
+  priority: "Low" | "Medium" | "High" | "Critical";
+  related_entity: CallToActionRelatedEntity;
+  status: "Pending" | "Approved" | "Executed" | "Dismissed";
+  jira_actions?: CtaJiraAction[];
+}
+
 // ── top-level payload ────────────────────────────────────────────────────────
 
 export interface MeetingMinutesPayload {
@@ -195,4 +232,5 @@ export interface MeetingMinutesPayload {
   issue_tracker: IssueTrackerEntry[];
   project_plan: ProjectPlanPayload;
   raid_log: RaidLogPayload;
+  call_to_actions?: CallToActionEntry[];
 }

@@ -1,5 +1,4 @@
 import { AppSidebar } from "@/components/ui/app-sidebar"
-import { SiteHeader } from "@/components/ui/site-header"
 import {
   SidebarInset,
   SidebarProvider,
@@ -17,7 +16,6 @@ const SidebarLayout = ({ children }: { children: React.ReactNode }) => {
     >
       <AppSidebar variant="sidebar" />
       <SidebarInset>
-        <SiteHeader />
         {children}
       </SidebarInset>
     </SidebarProvider>

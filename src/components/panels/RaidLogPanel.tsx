@@ -12,6 +12,9 @@ type Props = {
   isLoading?: boolean;
   isEmpty: boolean;
   embedded?: boolean;
+  editable?: boolean;
+  ownerOptions?: string[];
+  onChange?: (next: RaidLogPayload) => void;
 };
 
 type RaidType = "Risk" | "Assumption" | "Issue" | "Dependency";
@@ -123,6 +126,9 @@ export function RaidLogPanel({
   isLoading = false,
   isEmpty,
   embedded = false,
+  editable = false,
+  ownerOptions = [],
+  onChange,
 }: Props) {
   const rows = raid ? flattenRaid(raid) : [];
   const totalCount =
@@ -130,6 +136,76 @@ export function RaidLogPanel({
     (raid?.assumptions?.length ?? 0) +
     (raid?.issues?.length ?? 0) +
     (raid?.dependencies?.length ?? 0);
+
+  const updateItem = (
+    section: keyof RaidLogPayload,
+    idx: number,
+    key: string,
+    value: string
+  ) => {
+    if (!raid || !onChange) return;
+    if (section === "risks") {
+      const next = {
+        ...raid,
+        risks: raid.risks.map((item, i) =>
+          i !== idx
+            ? item
+            : {
+                ...item,
+                [key]:
+                  key === "related_tasks"
+                    ? value.split(",").map((v) => v.trim()).filter(Boolean)
+                    : value,
+              }
+        ),
+      };
+      onChange(next);
+      return;
+    }
+    if (section === "assumptions") {
+      const next = {
+        ...raid,
+        assumptions: raid.assumptions.map((item, i) =>
+          i !== idx ? item : { ...item, [key]: value }
+        ),
+      };
+      onChange(next);
+      return;
+    }
+    if (section === "issues") {
+      const next = {
+        ...raid,
+        issues: raid.issues.map((item, i) =>
+          i !== idx
+            ? item
+            : {
+                ...item,
+                [key]:
+                  key === "related_tasks"
+                    ? value.split(",").map((v) => v.trim()).filter(Boolean)
+                    : value,
+              }
+        ),
+      };
+      onChange(next);
+      return;
+    }
+    const next = {
+      ...raid,
+      dependencies: raid.dependencies.map((item, i) =>
+        i !== idx
+          ? item
+          : {
+              ...item,
+              [key]:
+                key === "dependent_tasks"
+                  ? value.split(",").map((v) => v.trim()).filter(Boolean)
+                  : value,
+            }
+      ),
+    };
+    onChange(next);
+  };
 
   const content = isEmpty || totalCount === 0 ? (
     <EmptyState
@@ -139,7 +215,7 @@ export function RaidLogPanel({
     />
   ) : (
     <div className="h-full overflow-auto p-2">
-      <table className="w-full min-w-[720px] text-left text-xs">
+      <table className="w-full min-w-[860px] text-left text-xs">
         <thead>
           <tr className="border-b border-border/50 text-muted-foreground">
             <th className="px-2 py-2 font-medium">Type</th>
@@ -154,7 +230,16 @@ export function RaidLogPanel({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
+          {rows.map((row, idx) => {
+            const src =
+              row.type === "Risk"
+                ? { section: "risks" as const, index: raid?.risks.findIndex((r) => r.risk_id === row.id) ?? -1 }
+                : row.type === "Assumption"
+                  ? { section: "assumptions" as const, index: raid?.assumptions.findIndex((a) => a.assumption_id === row.id) ?? -1 }
+                  : row.type === "Issue"
+                    ? { section: "issues" as const, index: raid?.issues.findIndex((i) => i.issue_id === row.id) ?? -1 }
+                    : { section: "dependencies" as const, index: raid?.dependencies.findIndex((d) => d.dependency_id === row.id) ?? -1 };
+            return (
             <tr key={`${row.type}-${row.id}-${idx}`} className="border-b border-border/30 align-top hover:bg-black/[0.02]">
               <td className="px-2 py-2.5">
                 <Badge variant={TYPE_VARIANT[row.type]}>{row.type}</Badge>
@@ -163,24 +248,35 @@ export function RaidLogPanel({
                 {row.id || "—"}
               </td>
               <td className="max-w-[200px] px-2 py-2.5 text-foreground">
-                {row.description || "—"}
+                {editable ? (
+                  <input value={row.description} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, "description", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" />
+                ) : (
+                  row.description || "—"
+                )}
               </td>
-              <td className="px-2 py-2.5 text-muted-foreground">{row.owner || "—"}</td>
-              <td className="px-2 py-2.5 text-muted-foreground">{row.impact || "—"}</td>
-              <td className="px-2 py-2.5 text-muted-foreground">{row.probability || "—"}</td>
+              <td className="px-2 py-2.5 text-muted-foreground">
+                {editable ? (
+                  <select value={row.owner} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, "owner", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs">
+                    <option value="">Select owner</option>
+                    {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+                  </select>
+                ) : (
+                  row.owner || "—"
+                )}
+              </td>
+              <td className="px-2 py-2.5 text-muted-foreground">{editable ? <input value={row.impact} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, row.type === "Assumption" ? "impact_if_invalid" : row.type === "Dependency" ? "impact_if_delayed" : "impact", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : row.impact || "—"}</td>
+              <td className="px-2 py-2.5 text-muted-foreground">{editable ? <input value={row.probability} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, "probability", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : row.probability || "—"}</td>
               <td className="px-2 py-2.5">
-                {row.status ? (
-                  <Badge variant="default">{row.status}</Badge>
-                ) : "—"}
+                {editable ? <input value={row.status} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, "status", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : row.status || "—"}
               </td>
               <td className="max-w-[160px] px-2 py-2.5 text-muted-foreground">
-                {row.mitigation || "—"}
+                {editable ? <input value={row.mitigation} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, row.type === "Risk" ? "mitigation_strategy" : row.type === "Issue" ? "resolution_path" : row.type === "Assumption" ? "validation_approach" : "description", e.target.value)} className="w-full rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : row.mitigation || "—"}
               </td>
               <td className="whitespace-nowrap px-2 py-2.5 text-muted-foreground">
-                {row.date || "—"}
+                {editable ? <input type="date" value={/\d{4}-\d{2}-\d{2}/.test(row.date) ? row.date : ""} onChange={(e) => src.index >= 0 && updateItem(src.section, src.index, row.type === "Dependency" ? "expected_resolution_date" : "identified_date", e.target.value)} className="rounded border border-border/40 bg-background/60 px-2 py-1 text-xs" /> : row.date || "—"}
               </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
     </div>

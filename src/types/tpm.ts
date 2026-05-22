@@ -5,6 +5,9 @@ export interface AgentApiRequest {
   session_id?: string;
   mode?: "analyze" | "refine";
   transcript?: string;
+  project_name?: string;
+  feedback_text?: string;
+  current_payload?: import("@/types/meetingPayload").MeetingMinutesPayload | null;
 }
 
 export interface AgentApiResponse {
@@ -12,5 +15,6 @@ export interface AgentApiResponse {
   payload: import("@/types/meetingPayload").MeetingMinutesPayload | null;
   persisted?: boolean;
   persist_error?: string;
+  atlassian_sync?: import("@/lib/sessionStore").AtlassianSyncSummary;
   error?: string;
 }

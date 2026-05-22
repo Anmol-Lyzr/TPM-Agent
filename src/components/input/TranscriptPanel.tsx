@@ -5,6 +5,8 @@ import { cn } from "@/lib/cn";
 
 export function TranscriptPanel({
   transcript,
+  projectName,
+  onProjectNameChange,
   onTranscriptChange,
   sessionId,
   isLoading,
@@ -14,6 +16,8 @@ export function TranscriptPanel({
   onLoadSample,
 }: {
   transcript: string;
+  projectName: string;
+  onProjectNameChange: (value: string) => void;
   onTranscriptChange: (value: string) => void;
   sessionId: string | null;
   isLoading: boolean;
@@ -32,6 +36,28 @@ export function TranscriptPanel({
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+        <div className="flex items-center justify-between gap-2">
+          <label
+            htmlFor="projectName"
+            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            Project name
+          </label>
+        </div>
+
+        <input
+          id="projectName"
+          value={projectName}
+          onChange={(e) => onProjectNameChange(e.target.value)}
+          disabled={isLoading}
+          placeholder="Enter project name..."
+          className={cn(
+            "h-10 rounded-lg border border-border/50 bg-background/60 px-3 text-sm text-foreground",
+            "placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20",
+            "disabled:cursor-not-allowed disabled:opacity-60"
+          )}
+        />
+
         <div className="flex items-center justify-between gap-2">
           <label
             htmlFor="transcript"
