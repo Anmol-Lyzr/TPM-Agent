@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Download, Loader2, Pencil, Save, Sparkles, X } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -17,6 +17,7 @@ import { formatAtlassianSyncMessage } from "@/lib/atlassian/formatSyncMessage";
 import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
 import { fetchJiraIssues, fetchJiraUsers, type JiraIssue, type JiraUser } from "@/lib/atlassianClient";
 import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
+import { applyCtaJiraResultsToPayload } from "@/lib/ctaJiraPayloadSync";
 import { saveSession } from "@/lib/sessionStore";
 import {
   downloadProjectPlanExcel,
@@ -46,6 +47,12 @@ const CTA_CATEGORIES: CtaCategory[] = [
 
 function normalizeText(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function issueKeysMatch(a?: string, b?: string): boolean {
+  const left = a?.trim().toUpperCase();
+  const right = b?.trim().toUpperCase();
+  return Boolean(left && right && left === right);
 }
 
 function toIssueType(value: string | undefined): IssueTrackerEntry["issue_type"] {
@@ -91,7 +98,11 @@ function jiraIssueToTrackerEntry(
   generatedIssues: IssueTrackerEntry[]
 ): IssueTrackerEntry {
   const summary = issue.fields?.summary?.trim() ?? "";
-  const generated = generatedIssues.find((row) => normalizeText(row.summary) === normalizeText(summary));
+  const generated = generatedIssues.find(
+    (row) =>
+      normalizeText(row.summary) === normalizeText(summary) ||
+      issueKeysMatch(row.issue_key, issue.key)
+  );
   const priority = toIssuePriority(issue.fields?.priority?.name ?? generated?.priority);
   return {
     issue_key: issue.key,
@@ -178,36 +189,41 @@ export function DashboardTabs({
     };
   }, [draftPayload, statusOverrides]);
 
-  useEffect(() => {
-    if (activeTab !== "issues") return;
-    let cancelled = false;
+  const reloadJiraData = useCallback(async () => {
     setIsLoadingJiraIssues(true);
     setIsLoadingJiraUsers(true);
     setJiraIssueError(null);
     setJiraUserError(null);
-    void Promise.allSettled([fetchJiraIssues(), fetchJiraUsers()]).then(([issuesResult, usersResult]) => {
-      if (cancelled) return;
-      if (issuesResult.status === "fulfilled") {
-        setJiraIssues(issuesResult.value.issues ?? []);
-      } else {
-        setJiraIssueError(
-          issuesResult.reason instanceof Error ? issuesResult.reason.message : "Failed to load Jira issues"
-        );
-      }
-      if (usersResult.status === "fulfilled") {
-        setJiraUsers(usersResult.value.users ?? []);
-      } else {
-        setJiraUserError(
-          usersResult.reason instanceof Error ? usersResult.reason.message : "Failed to load Atlassian users"
-        );
-      }
-      setIsLoadingJiraIssues(false);
-      setIsLoadingJiraUsers(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab]);
+    const [issuesResult, usersResult] = await Promise.allSettled([
+      fetchJiraIssues(),
+      fetchJiraUsers(),
+    ]);
+    if (issuesResult.status === "fulfilled") {
+      setJiraIssues(issuesResult.value.issues ?? []);
+    } else {
+      setJiraIssueError(
+        issuesResult.reason instanceof Error
+          ? issuesResult.reason.message
+          : "Failed to load Jira issues"
+      );
+    }
+    if (usersResult.status === "fulfilled") {
+      setJiraUsers(usersResult.value.users ?? []);
+    } else {
+      setJiraUserError(
+        usersResult.reason instanceof Error
+          ? usersResult.reason.message
+          : "Failed to load Atlassian users"
+      );
+    }
+    setIsLoadingJiraIssues(false);
+    setIsLoadingJiraUsers(false);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "issues") return;
+    void reloadJiraData();
+  }, [activeTab, reloadJiraData]);
 
   const issueRows = useMemo(() => {
     const generatedIssues = effectivePayload?.issue_tracker ?? [];
@@ -276,11 +292,16 @@ export function DashboardTabs({
     return "Pending";
   };
 
-  const persistCtaStatus = async (ctaId: string, status: CallToActionEntry["status"]) => {
+  const persistCtaStatus = async (
+    ctaId: string,
+    status: CallToActionEntry["status"],
+    payloadOverride?: MeetingMinutesPayload
+  ) => {
     if (!sessionId || !draftPayload) return;
+    const base = payloadOverride ?? draftPayload;
     const updatedPayload: MeetingMinutesPayload = {
-      ...draftPayload,
-      call_to_actions: (draftPayload.call_to_actions ?? []).map((cta) =>
+      ...base,
+      call_to_actions: (base.call_to_actions ?? []).map((cta) =>
         cta.cta_id === ctaId ? { ...cta, status } : cta
       ),
     };
@@ -327,9 +348,13 @@ export function DashboardTabs({
           );
           return;
         }
-        await persistCtaStatus(ctaId, "Executed");
+        const payloadWithJira = applyCtaJiraResultsToPayload(draftPayload, cta, exec);
+        await persistCtaStatus(ctaId, "Executed", payloadWithJira);
+        if (activeTab === "issues") {
+          await reloadJiraData();
+        }
         setSaveNotice(
-          `CTA executed in Jira (${exec.steps.map((s) => s.operation).join(" → ")})`
+          `CTA executed in Jira (${exec.steps.map((s) => s.operation).join(" → ")}). Issue tracker updated.`
         );
       } else {
         await persistCtaStatus(ctaId, "Executed");

@@ -2,6 +2,7 @@
 
 import { Bug } from "lucide-react";
 import type { IssueTrackerEntry } from "@/types/meetingPayload";
+import { extractLatestJiraComment } from "@/lib/ctaJiraPayloadSync";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PanelHeader } from "@/components/ui/PanelHeader";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -57,6 +58,7 @@ export function IssueTracker({
             <th className="px-2 py-2 font-medium">Due Date</th>
             <th className="px-2 py-2 font-medium">Priority</th>
             <th className="px-2 py-2 font-medium">Severity</th>
+            <th className="px-2 py-2 font-medium">Latest Jira note</th>
           </tr>
         </thead>
         <tbody>
@@ -124,6 +126,11 @@ export function IssueTracker({
                 ) : (
                   issue.severity || "—"
                 )}
+              </td>
+              <td className="max-w-[200px] px-2 py-2.5 text-muted-foreground">
+                <span className="line-clamp-2" title={issue.description || undefined}>
+                  {extractLatestJiraComment(issue.description) ?? "—"}
+                </span>
               </td>
             </tr>
           ))}

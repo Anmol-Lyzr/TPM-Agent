@@ -66,6 +66,22 @@ export interface ConfluencePagesResponse {
   results?: ConfluencePage[];
 }
 
+function parseAtlassianJson<T>(text: string, res: Response): T {
+  const trimmed = text.trim();
+  if (!trimmed) return {} as T;
+  if (trimmed.startsWith("<")) {
+    throw new Error(
+      `Atlassian API returned HTML instead of JSON (${res.status}). ` +
+        "Ensure TPM backend is running and reachable via /api/atlassian proxy."
+    );
+  }
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    throw new Error(`Atlassian API returned invalid JSON (${res.status})`);
+  }
+}
+
 async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), {
     ...init,
@@ -75,7 +91,7 @@ async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  const data = parseAtlassianJson<T & { error?: string }>(text, res);
   if (!res.ok) {
     throw new Error(data.error ?? `Request failed (${res.status})`);
   }
