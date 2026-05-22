@@ -2,11 +2,13 @@ import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 import {
   createConfluencePage,
   fetchAtlassianStatus,
+  fetchJiraIssues,
   getConfluencePage,
   getIssueTransitions,
   transitionJiraIssue,
   updateConfluencePage,
   updateJiraIssue,
+  type AtlassianStatus,
 } from "@/lib/atlassian/client";
 import {
   buildJiraUpdateFields,
@@ -56,6 +58,48 @@ async function syncIssueStatus(issueKey: string, statusName: string): Promise<vo
     throw new Error(`No Jira transition "${target}" for ${issueKey}`);
   }
   await transitionJiraIssue(issueKey, match.id);
+}
+
+function normalizeText(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function hasProjectPrefix(issueKey: string, projectKey?: string): boolean {
+  if (!projectKey?.trim()) return false;
+  return issueKey.trim().toUpperCase().startsWith(`${projectKey.trim().toUpperCase()}-`);
+}
+
+function needsJiraKeyResolution(issueKey: string, projectKey?: string): boolean {
+  return Boolean(issueKey.trim() && projectKey?.trim() && !hasProjectPrefix(issueKey, projectKey));
+}
+
+async function buildRealJiraKeyBySummary(projectKey: string): Promise<Map<string, string>> {
+  const data = await fetchJiraIssues(`project = ${projectKey} ORDER BY created DESC`);
+  const map = new Map<string, string>();
+  for (const issue of data.issues ?? []) {
+    const summary = normalizeText(issue.fields?.summary);
+    const key = issue.key?.trim();
+    if (summary && key) map.set(summary, key);
+  }
+  return map;
+}
+
+function resolveRealIssueKey(
+  generatedIssueKey: string,
+  summary: string,
+  projectKey: string | undefined,
+  realKeyBySummary: Map<string, string> | undefined
+): string {
+  if (!needsJiraKeyResolution(generatedIssueKey, projectKey)) return generatedIssueKey;
+  const realKey = realKeyBySummary?.get(normalizeText(summary));
+  if (realKey) {
+    console.info(`[jira-sync] resolved issue_key ${generatedIssueKey} → ${realKey}`);
+    return realKey;
+  }
+  throw new Error(
+    `Could not resolve generated issue key ${generatedIssueKey} to a real Jira key in project ${projectKey}. ` +
+      "Check that the Jira issue exists and its summary still matches the Issue Tracker row."
+  );
 }
 
 export function buildConfluenceHtml(payload: MeetingMinutesPayload): string {
@@ -133,7 +177,8 @@ export function buildConfluenceHtml(payload: MeetingMinutesPayload): string {
 
 async function syncJiraIssues(
   payload: MeetingMinutesPayload,
-  onlyKeys?: string[]
+  onlyKeys?: string[],
+  status?: AtlassianStatus
 ): Promise<{
   updated: string[];
   failed: Array<{ issueKey: string; error: string }>;
@@ -144,14 +189,23 @@ async function syncJiraIssues(
     ? new Set(onlyKeys.map((k) => k.trim()).filter(Boolean))
     : null;
   const issues = payload.issue_tracker ?? [];
+  const projectKey = status?.jiraProjectKey?.trim();
+  const needsLookup = issues.some((issue) => {
+    const key = issue.issue_key?.trim() ?? "";
+    if (!key || (keyFilter && !keyFilter.has(key))) return false;
+    return needsJiraKeyResolution(key, projectKey);
+  });
+  const realKeyBySummary =
+    needsLookup && projectKey ? await buildRealJiraKeyBySummary(projectKey) : undefined;
 
   for (const issue of issues) {
-    const key = issue.issue_key?.trim() ?? "";
-    if (!isValidJiraIssueKey(key)) continue;
-    if (keyFilter && !keyFilter.has(key)) continue;
+    const sourceKey = issue.issue_key?.trim() ?? "";
+    if (!isValidJiraIssueKey(sourceKey)) continue;
+    if (keyFilter && !keyFilter.has(sourceKey)) continue;
     if (!issueHasSyncableFields(issue)) continue;
 
     try {
+      const key = resolveRealIssueKey(sourceKey, issue.summary, projectKey, realKeyBySummary);
       const fields = await buildJiraUpdateFields(issue);
       if (Object.keys(fields).length) {
         await updateJiraIssue(key, { fields });
@@ -162,7 +216,7 @@ async function syncJiraIssues(
       updated.push(key);
     } catch (err) {
       failed.push({
-        issueKey: key,
+        issueKey: sourceKey,
         error: err instanceof Error ? err.message : "Jira update failed",
       });
     }
@@ -257,7 +311,7 @@ export async function syncMeetingPayloadToAtlassian(
 
   base.skipped = false;
 
-  const jiraResult = await syncJiraIssues(payload, options.syncIssueKeys);
+  const jiraResult = await syncJiraIssues(payload, options.syncIssueKeys, status);
   base.jira = jiraResult;
   if (jiraResult.failed.length) {
     for (const f of jiraResult.failed) {

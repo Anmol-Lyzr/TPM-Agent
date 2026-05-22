@@ -43,6 +43,16 @@ export type AtlassianStatus = {
   confluenceSpaceKey?: string;
 };
 
+export type JiraIssueSearchResult = {
+  issues?: Array<{
+    id?: string;
+    key?: string;
+    fields?: {
+      summary?: string;
+    };
+  }>;
+};
+
 async function backendFetch<T>(
   path: string,
   init?: RequestInit
@@ -91,6 +101,11 @@ async function backendFetch<T>(
 
 export async function fetchAtlassianStatus(): Promise<AtlassianStatus> {
   return backendFetch<AtlassianStatus>("/api/atlassian/status");
+}
+
+export async function fetchJiraIssues(jql?: string): Promise<JiraIssueSearchResult> {
+  const query = jql ? `?jql=${encodeURIComponent(jql)}` : "";
+  return backendFetch<JiraIssueSearchResult>(`/api/atlassian/jira/issues${query}`);
 }
 
 export async function updateJiraIssue(

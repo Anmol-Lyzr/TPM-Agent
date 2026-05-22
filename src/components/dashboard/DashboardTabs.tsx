@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Loader2, Pencil, Save, Sparkles, X } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
@@ -14,9 +14,10 @@ import { isBugIssue } from "@/lib/analytics";
 import { postAgent } from "@/lib/agentClient";
 import { formatAtlassianSyncMessage } from "@/lib/atlassian/formatSyncMessage";
 import { isValidJiraIssueKey } from "@/lib/atlassian/jiraFields";
+import { fetchJiraIssues, type JiraIssue } from "@/lib/atlassianClient";
 import { executeCtaJiraActionsForCta } from "@/lib/ctaClient";
 import { saveSession } from "@/lib/sessionStore";
-import type { CallToActionEntry } from "@/types/meetingPayload";
+import type { CallToActionEntry, IssueTrackerEntry } from "@/types/meetingPayload";
 import type { DashboardTabId } from "@/types/tpm";
 import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
@@ -35,6 +36,83 @@ const CTA_CATEGORIES: CtaCategory[] = [
   "Meeting & MoM Follow-ups",
   "Health & Progress Anomalies",
 ];
+
+function normalizeText(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function toIssueType(value: string | undefined): IssueTrackerEntry["issue_type"] {
+  if (value === "Bug" || value === "Story" || value === "Task" || value === "Epic") return value;
+  return "Task";
+}
+
+function toIssueStatus(value: string | undefined): IssueTrackerEntry["status"] {
+  if (
+    value === "Open" ||
+    value === "To Do" ||
+    value === "In Progress" ||
+    value === "Done" ||
+    value === "Blocked" ||
+    value === "Resolved" ||
+    value === "Closed"
+  ) {
+    return value;
+  }
+  const normalized = normalizeText(value);
+  if (normalized.includes("progress")) return "In Progress";
+  if (normalized.includes("done")) return "Done";
+  if (normalized.includes("closed")) return "Closed";
+  if (normalized.includes("resolved")) return "Resolved";
+  if (normalized.includes("block")) return "Blocked";
+  if (normalized.includes("to do") || normalized.includes("todo") || normalized.includes("backlog")) {
+    return "To Do";
+  }
+  return "Open";
+}
+
+function toIssuePriority(value: string | undefined): IssueTrackerEntry["priority"] {
+  if (value === "Low" || value === "Medium" || value === "High" || value === "Critical") return value;
+  const normalized = normalizeText(value);
+  if (normalized.includes("highest") || normalized.includes("critical")) return "Critical";
+  if (normalized.includes("high")) return "High";
+  if (normalized.includes("low")) return "Low";
+  return "Medium";
+}
+
+function jiraIssueToTrackerEntry(
+  issue: JiraIssue,
+  generatedIssues: IssueTrackerEntry[]
+): IssueTrackerEntry {
+  const summary = issue.fields?.summary?.trim() ?? "";
+  const generated = generatedIssues.find((row) => normalizeText(row.summary) === normalizeText(summary));
+  const priority = toIssuePriority(issue.fields?.priority?.name ?? generated?.priority);
+  return {
+    issue_key: issue.key,
+    issue_type: toIssueType(issue.fields?.issuetype?.name ?? generated?.issue_type),
+    summary: summary || generated?.summary || "Untitled Jira issue",
+    description: generated?.description ?? "",
+    priority,
+    status: toIssueStatus(issue.fields?.status?.name ?? generated?.status),
+    assignee: issue.fields?.assignee?.displayName ?? generated?.assignee ?? "",
+    reporter: generated?.reporter ?? "",
+    sprint: generated?.sprint ?? "",
+    epic: generated?.epic ?? "",
+    labels: generated?.labels ?? [],
+    story_points: generated?.story_points ?? 0,
+    blocked_by: generated?.blocked_by ?? [],
+    due_date: generated?.due_date ?? "",
+    acceptance_criteria: generated?.acceptance_criteria ?? [],
+    severity: generated?.severity ?? priority,
+    module: generated?.module ?? "",
+    root_cause: generated?.root_cause ?? "",
+    steps_to_reproduce: generated?.steps_to_reproduce ?? [],
+    impact: generated?.impact ?? "",
+    workaround: generated?.workaround ?? "",
+    resolution_plan: generated?.resolution_plan ?? "",
+    date_opened: generated?.date_opened ?? "",
+    date_resolved: generated?.date_resolved ?? null,
+  };
+}
 
 export function DashboardTabs({
   payload,
@@ -73,6 +151,9 @@ export function DashboardTabs({
   const [isRefining, setIsRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
   const [dirtyIssueKeys, setDirtyIssueKeys] = useState<string[]>([]);
+  const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
+  const [isLoadingJiraIssues, setIsLoadingJiraIssues] = useState(false);
+  const [jiraIssueError, setJiraIssueError] = useState<string | null>(null);
 
   const effectivePayload = useMemo(() => {
     if (!draftPayload) return null;
@@ -86,11 +167,39 @@ export function DashboardTabs({
     };
   }, [draftPayload, statusOverrides]);
 
+  useEffect(() => {
+    if (activeTab !== "issues") return;
+    let cancelled = false;
+    setIsLoadingJiraIssues(true);
+    setJiraIssueError(null);
+    fetchJiraIssues()
+      .then((data) => {
+        if (!cancelled) setJiraIssues(data.issues ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setJiraIssueError(err instanceof Error ? err.message : "Failed to load Jira issues");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingJiraIssues(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const issueRows = useMemo(() => {
+    const generatedIssues = effectivePayload?.issue_tracker ?? [];
+    if (!jiraIssues.length) return generatedIssues;
+    return jiraIssues.map((issue) => jiraIssueToTrackerEntry(issue, generatedIssues));
+  }, [effectivePayload, jiraIssues]);
+
   const filteredIssues = useMemo(() => {
-    const issues = effectivePayload?.issue_tracker ?? [];
+    const issues = issueRows;
     if (issueFilter !== "bug") return issues;
     return issues.filter((issue) => isBugIssue(issue.issue_type));
-  }, [effectivePayload, issueFilter]);
+  }, [issueRows, issueFilter]);
 
   const isEmpty = showEmpty || !payload;
   const issuesEmpty = isEmpty || filteredIssues.length === 0;
@@ -184,7 +293,7 @@ export function DashboardTabs({
 
       const jiraActions = cta.jira_actions ?? [];
       if (jiraActions.length > 0) {
-        const exec = await executeCtaJiraActionsForCta(cta);
+        const exec = await executeCtaJiraActionsForCta(cta, draftPayload);
         if (!exec.ok) {
           setStatusOverrides((prev) => {
             const copy = { ...prev };
@@ -237,13 +346,15 @@ export function DashboardTabs({
     return [...owners];
   }, [effectivePayload]);
 
-  const markDirtyIssues = (nextIssues: MeetingMinutesPayload["issue_tracker"]) => {
-    const prev = draftPayload?.issue_tracker ?? [];
+  const markDirtyIssues = (
+    nextIssues: MeetingMinutesPayload["issue_tracker"],
+    previousIssues: MeetingMinutesPayload["issue_tracker"] = draftPayload?.issue_tracker ?? []
+  ) => {
     const changed: string[] = [];
     for (const issue of nextIssues) {
       const key = issue.issue_key?.trim();
       if (!key) continue;
-      const before = prev.find((row) => row.issue_key === key);
+      const before = previousIssues.find((row) => row.issue_key === key);
       if (!before || JSON.stringify(before) !== JSON.stringify(issue)) {
         changed.push(key);
       }
@@ -599,6 +710,11 @@ export function DashboardTabs({
           {saveError}
         </div>
       ) : null}
+      {activeTab === "issues" && jiraIssueError ? (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          Jira issues could not be loaded, showing generated issue tracker rows. {jiraIssueError}
+        </div>
+      ) : null}
 
       <article className="glass-card relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
         <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -624,12 +740,12 @@ export function DashboardTabs({
             <IssueTracker
               embedded
               issues={filteredIssues}
-              isLoading={isLoading}
-              isEmpty={issuesEmpty}
+              isLoading={isLoading || isLoadingJiraIssues}
+              isEmpty={issuesEmpty && !jiraIssues.length}
               editable={isEditingAll}
               ownerOptions={ownerOptions}
               onChange={(next) => {
-                markDirtyIssues(next);
+                markDirtyIssues(next, filteredIssues);
                 setDraftPayload((prev) => (prev ? { ...prev, issue_tracker: next } : prev));
                 setIsDirty(true);
               }}

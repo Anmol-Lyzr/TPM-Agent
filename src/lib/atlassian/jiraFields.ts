@@ -53,7 +53,15 @@ export async function buildJiraUpdateFields(
 
   if (issue.priority) fields.priority = { name: issue.priority };
   if (issue.assignee?.trim()) {
-    fields.assignee = { accountId: await resolveJiraAccountId(issue.assignee) };
+    try {
+      fields.assignee = { accountId: await resolveJiraAccountId(issue.assignee) };
+    } catch (err) {
+      console.warn(
+        `[jira-sync] skipping assignee update for "${issue.assignee}": ${
+          err instanceof Error ? err.message : "Jira user lookup failed"
+        }`
+      );
+    }
   }
 
   return fields;

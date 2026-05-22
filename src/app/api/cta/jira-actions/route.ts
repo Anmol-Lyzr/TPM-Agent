@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeCtaJiraActions } from "@/lib/atlassian/executeJiraActions";
+import {
+  executeCtaJiraActions,
+  resolveCtaJiraActionIssueKeys,
+} from "@/lib/atlassian/executeJiraActions";
 import { fetchAtlassianStatus, getTpmBackendUrl } from "@/lib/atlassian/client";
 import type { CtaJiraAction } from "@/types/jiraActions";
-import type { CallToActionEntry } from "@/types/meetingPayload";
+import type { CallToActionEntry, MeetingMinutesPayload } from "@/types/meetingPayload";
 
 export const runtime = "nodejs";
 
@@ -15,6 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const cta = body.cta as CallToActionEntry | undefined;
+    const payload = body.payload as MeetingMinutesPayload | undefined;
     const actions = normalizeJiraActions(cta?.jira_actions ?? body.jira_actions);
 
     console.info(
@@ -47,7 +51,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await executeCtaJiraActions(actions);
+    const resolvedActions = await resolveCtaJiraActionIssueKeys(actions, {
+      payload,
+      status,
+    });
+    const result = await executeCtaJiraActions(resolvedActions);
     console.info(
       `[cta/jira-actions] done cta_id=${cta?.cta_id ?? "—"} ok=${result.ok} steps=${result.steps.length}`
     );

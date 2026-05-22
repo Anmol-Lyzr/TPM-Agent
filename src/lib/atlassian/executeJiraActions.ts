@@ -2,6 +2,8 @@ import {
   assignJiraIssue,
   createJiraIssue,
   createJiraIssueComment,
+  fetchJiraIssues,
+  type AtlassianStatus,
   getIssueTransitions,
   getTpmBackendUrl,
   linkJiraIssues,
@@ -16,6 +18,7 @@ import type {
   JiraActionFields,
   JiraActionStepResult,
 } from "@/types/jiraActions";
+import type { MeetingMinutesPayload } from "@/types/meetingPayload";
 
 function fieldHasValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -23,6 +26,112 @@ function fieldHasValue(value: unknown): boolean {
   if (typeof value === "number") return value > 0;
   if (Array.isArray(value)) return value.length > 0;
   return false;
+}
+
+function cloneAction(action: CtaJiraAction): CtaJiraAction {
+  return {
+    ...action,
+    fields: { ...(action.fields ?? {}) } as JiraActionFields,
+  };
+}
+
+function normalizeText(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function hasProjectPrefix(issueKey: string, projectKey?: string): boolean {
+  if (!projectKey?.trim()) return false;
+  return issueKey.trim().toUpperCase().startsWith(`${projectKey.trim().toUpperCase()}-`);
+}
+
+function needsResolution(issueKey: string | undefined, projectKey?: string): boolean {
+  const key = issueKey?.trim();
+  return Boolean(key && projectKey?.trim() && !hasProjectPrefix(key, projectKey));
+}
+
+function findPayloadSummary(
+  syntheticIssueKey: string,
+  payload?: MeetingMinutesPayload | null
+): string | undefined {
+  const key = syntheticIssueKey.trim().toLowerCase();
+  return payload?.issue_tracker
+    ?.find((issue) => issue.issue_key?.trim().toLowerCase() === key)
+    ?.summary?.trim();
+}
+
+async function buildRealJiraKeyBySummary(projectKey: string): Promise<Map<string, string>> {
+  const data = await fetchJiraIssues(`project = ${projectKey} ORDER BY created DESC`);
+  const map = new Map<string, string>();
+  for (const issue of data.issues ?? []) {
+    const summary = normalizeText(issue.fields?.summary);
+    const key = issue.key?.trim();
+    if (summary && key) map.set(summary, key);
+  }
+  return map;
+}
+
+async function resolveIssueKey(
+  issueKey: string | undefined,
+  options: {
+    payload?: MeetingMinutesPayload | null;
+    projectKey?: string;
+    realKeyBySummary?: Map<string, string>;
+  }
+): Promise<string | undefined> {
+  const key = issueKey?.trim();
+  if (!key) return undefined;
+  if (!needsResolution(key, options.projectKey)) return key;
+
+  const summary = findPayloadSummary(key, options.payload);
+  const resolved = summary ? options.realKeyBySummary?.get(normalizeText(summary)) : undefined;
+  if (resolved) {
+    console.info(`[cta/jira-actions] resolved issue_key ${key} → ${resolved}`);
+    return resolved;
+  }
+
+  throw new Error(
+    `Could not resolve generated issue key ${key} to a real Jira key in project ${options.projectKey}. ` +
+      "Check that the Jira issue exists and its summary still matches the generated issue tracker row."
+  );
+}
+
+export async function resolveCtaJiraActionIssueKeys(
+  actions: CtaJiraAction[],
+  options: {
+    payload?: MeetingMinutesPayload | null;
+    status?: AtlassianStatus;
+  }
+): Promise<CtaJiraAction[]> {
+  const projectKey = options.status?.jiraProjectKey?.trim();
+  const needsLookup = actions.some(
+    (action) =>
+      needsResolution(action.issue_key, projectKey) ||
+      needsResolution(action.linked_issue_key, projectKey)
+  );
+  const realKeyBySummary =
+    needsLookup && projectKey ? await buildRealJiraKeyBySummary(projectKey) : undefined;
+
+  const resolved: CtaJiraAction[] = [];
+  for (const action of actions) {
+    const next = cloneAction(action);
+    const nextIssueKey = await resolveIssueKey(next.issue_key, {
+      payload: options.payload,
+      projectKey,
+      realKeyBySummary,
+    });
+    if (nextIssueKey) next.issue_key = nextIssueKey;
+
+    const nextLinkedIssueKey = await resolveIssueKey(next.linked_issue_key, {
+      payload: options.payload,
+      projectKey,
+      realKeyBySummary,
+    });
+    if (nextLinkedIssueKey) next.linked_issue_key = nextLinkedIssueKey;
+
+    resolved.push(next);
+  }
+
+  return resolved;
 }
 
 async function buildJiraFields(
