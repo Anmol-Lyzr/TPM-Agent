@@ -329,7 +329,11 @@ function SessionViewContent() {
       });
       const result = await pollAgentJob(job_id);
       if (result.status === "failed") {
-        throw new Error(result.error ?? "Agent job failed");
+        throw new Error(
+          result.stage
+            ? `Agent job failed at ${result.stage}: ${result.error ?? "Unknown error"}`
+            : result.error ?? "Agent job failed"
+        );
       }
       const sessionId = result.session_id ?? newSessionId;
       setStoredSessionId(sessionId);
@@ -370,7 +374,11 @@ function SessionViewContent() {
       });
       const result = await pollAgentJob(job_id);
       if (result.status === "failed") {
-        throw new Error(result.error ?? "Agent job failed");
+        throw new Error(
+          result.stage
+            ? `Agent job failed at ${result.stage}: ${result.error ?? "Unknown error"}`
+            : result.error ?? "Agent job failed"
+        );
       }
       const sessionId = result.session_id ?? newSessionId;
       setStoredSessionId(sessionId);

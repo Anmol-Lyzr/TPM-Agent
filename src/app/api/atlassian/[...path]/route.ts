@@ -45,6 +45,17 @@ async function proxyAtlassian(
 
   const text = await res.text();
   const contentType = res.headers.get("content-type") ?? "application/json";
+  if (text.trim().startsWith("<")) {
+    return NextResponse.json(
+      {
+        error:
+          res.status === 502
+            ? "TPM backend or Atlassian upstream returned 502 Bad Gateway. Retry after the backend is stable."
+            : `TPM backend returned HTML instead of JSON (${res.status})`,
+      },
+      { status: res.status }
+    );
+  }
   return new NextResponse(text || "{}", {
     status: res.status,
     headers: { "Content-Type": contentType },

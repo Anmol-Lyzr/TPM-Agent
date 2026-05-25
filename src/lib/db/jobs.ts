@@ -6,10 +6,19 @@ const COLLECTION = "agent_jobs";
 let indexesEnsured = false;
 
 export type JobStatus = "pending" | "processing" | "completed" | "failed";
+export type AgentJobStage =
+  | "queued"
+  | "calling_lyzr"
+  | "parsing_agent_response"
+  | "saving_session"
+  | "syncing_atlassian"
+  | "completed"
+  | "failed";
 
 export interface AgentJobDocument {
   jobId: string;
   status: JobStatus;
+  stage: AgentJobStage;
   mode: "analyze" | "refine";
   sessionId: string;
   message: string;
@@ -54,6 +63,7 @@ export async function createJob(input: CreateJobInput): Promise<AgentJobDocument
   const doc: AgentJobDocument = {
     jobId: randomUUID(),
     status: "pending",
+    stage: "queued",
     ...input,
     createdAt: now,
     updatedAt: now,
@@ -66,7 +76,7 @@ export async function updateJobStatus(
   jobId: string,
   update: Partial<Pick<
     AgentJobDocument,
-    "status" | "resultSessionId" | "resultPayload" | "persisted" | "persistError" | "atlassianSync" | "error"
+    "status" | "stage" | "resultSessionId" | "resultPayload" | "persisted" | "persistError" | "atlassianSync" | "error"
   >>
 ): Promise<void> {
   const db = await getDb();

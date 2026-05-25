@@ -5,6 +5,7 @@ import { extractAgentPayload } from "@/lib/agent/pipeline";
 import { upsertSession } from "@/lib/db/sessions";
 import { runSessionAtlassianSync } from "@/lib/atlassian/runSessionSync";
 import { createJob, updateJobStatus } from "@/lib/db/jobs";
+import { shouldRunJobAtlassianSync } from "@/lib/agent/jobOptions";
 
 export const runtime = "nodejs";
 // 6 minutes: response is instant, but after() keeps the function alive for the agent call
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const mode = body.mode === "refine" ? "refine" : "analyze";
     const message = typeof body.message === "string" ? body.message.trim() : "";
+    const shouldSyncAtlassian = shouldRunJobAtlassianSync(body.sync_atlassian);
     const projectName =
       typeof body.project_name === "string" ? body.project_name.trim() || undefined : undefined;
 
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Run the actual agent call after the response is sent
     after(async () => {
-      await updateJobStatus(job.jobId, { status: "processing" });
+      await updateJobStatus(job.jobId, { status: "processing", stage: "calling_lyzr" });
       try {
         const refineMessage =
           mode === "refine"
@@ -89,11 +91,13 @@ export async function POST(req: NextRequest) {
           userId: userId!,
         });
 
+        await updateJobStatus(job.jobId, { stage: "parsing_agent_response" });
         const payload = extractAgentPayload(raw);
 
         let persisted = false;
         let persistError: string | undefined;
         let confluencePageId: string | undefined;
+        await updateJobStatus(job.jobId, { stage: "saving_session" });
         try {
           const doc = await upsertSession(returnedSessionId, {
             payload,
@@ -106,9 +110,18 @@ export async function POST(req: NextRequest) {
           persistError = err instanceof Error ? err.message : "DB persist failed";
         }
 
+        await updateJobStatus(job.jobId, {
+          status: "completed",
+          stage: "completed",
+          resultSessionId: returnedSessionId,
+          resultPayload: payload,
+          persisted,
+          persistError,
+        });
+
         const syncTrigger = mode === "refine" ? "agent_refine" : "agent_analyze";
-        let atlassianSync: Record<string, unknown> | undefined;
-        if (persisted && payload) {
+        if (shouldSyncAtlassian && persisted && payload) {
+          let atlassianSync: Record<string, unknown>;
           try {
             atlassianSync = (await runSessionAtlassianSync(
               returnedSessionId,
@@ -127,19 +140,12 @@ export async function POST(req: NextRequest) {
               errors: [err instanceof Error ? err.message : "Atlassian sync failed"],
             };
           }
+          await updateJobStatus(job.jobId, { atlassianSync });
         }
-
-        await updateJobStatus(job.jobId, {
-          status: "completed",
-          resultSessionId: returnedSessionId,
-          resultPayload: payload,
-          persisted,
-          persistError,
-          atlassianSync,
-        });
       } catch (err) {
         await updateJobStatus(job.jobId, {
           status: "failed",
+          stage: "failed",
           error: err instanceof Error ? err.message : "Unknown error",
         });
       }

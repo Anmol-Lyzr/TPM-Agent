@@ -25,10 +25,19 @@ export interface AgentJobCreateResponse {
 }
 
 export type AgentJobStatus = "pending" | "processing" | "completed" | "failed";
+export type AgentJobStage =
+  | "queued"
+  | "calling_lyzr"
+  | "parsing_agent_response"
+  | "saving_session"
+  | "syncing_atlassian"
+  | "completed"
+  | "failed";
 
 export interface AgentJobStatusResponse {
   job_id: string;
   status: AgentJobStatus;
+  stage?: AgentJobStage;
   mode: "analyze" | "refine";
   session_id?: string;
   payload?: import("@/types/meetingPayload").MeetingMinutesPayload | null;

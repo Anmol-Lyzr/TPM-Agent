@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     return NextResponse.json({
       job_id: job.jobId,
       status: job.status,
+      stage: job.stage,
       mode: job.mode,
       session_id: job.resultSessionId,
       payload: job.resultPayload,

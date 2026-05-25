@@ -29,6 +29,7 @@ export async function postAgentJob(body: {
   project_name?: string;
   feedback_text?: string;
   current_payload?: import("@/types/meetingPayload").MeetingMinutesPayload | null;
+  sync_atlassian?: boolean;
 }): Promise<AgentJobCreateResponse> {
   const res = await fetch("/api/agent/jobs", {
     method: "POST",

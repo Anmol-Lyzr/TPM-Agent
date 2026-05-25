@@ -109,6 +109,21 @@ export function DashboardTabs({
     };
   }, [draftPayload, statusOverrides]);
 
+  const reloadJiraIssues = useCallback(async () => {
+    setIsLoadingJiraIssues(true);
+    setJiraIssueError(null);
+    try {
+      const data = await fetchJiraIssues();
+      setJiraIssues(data.issues ?? []);
+    } catch (err) {
+      setJiraIssueError(
+        err instanceof Error ? err.message : "Failed to load Jira issues"
+      );
+    } finally {
+      setIsLoadingJiraIssues(false);
+    }
+  }, []);
+
   const reloadJiraData = useCallback(async () => {
     setIsLoadingJiraIssues(true);
     setIsLoadingJiraUsers(true);
@@ -378,6 +393,56 @@ export function DashboardTabs({
     }
   };
 
+  const saveIssueTrackerEdit = async (
+    nextIssues: MeetingMinutesPayload["issue_tracker"],
+    changedIssue: IssueTrackerEntry
+  ) => {
+    if (!effectivePayload || !sessionId) {
+      throw new Error("No active session to save this ticket");
+    }
+
+    const changedKey = changedIssue.issue_key?.trim();
+    const syncIssueKeys =
+      changedKey && isValidJiraIssueKey(changedKey) ? [changedKey] : undefined;
+    const updatedPayload: MeetingMinutesPayload = {
+      ...effectivePayload,
+      issue_tracker: nextIssues,
+    };
+
+    setIsSavingPayload(true);
+    setSaveError(null);
+    setSaveNotice(null);
+
+    try {
+      const saved = await saveSession(
+        sessionId,
+        { payload: updatedPayload },
+        { syncIssueKeys }
+      );
+      setDraftPayload(saved.payload ?? updatedPayload);
+      setIsDirty(false);
+      setDirtyIssueKeys([]);
+      setStatusOverrides({});
+
+      const sync = saved.atlassian_sync;
+      if (sync?.errors?.length) {
+        const message = `Saved in app. ${sync.errors.join("; ")}`;
+        setSaveError(message);
+        throw new Error(message);
+      }
+
+      const syncMsg = formatAtlassianSyncMessage(sync);
+      setSaveNotice(syncMsg || "Ticket changes saved.");
+      await reloadJiraIssues();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save ticket changes";
+      setSaveError(message);
+      throw new Error(message);
+    } finally {
+      setIsSavingPayload(false);
+    }
+  };
+
   const handleFeedbackSubmit = async () => {
     if (!sessionId || !effectivePayload || !feedbackText.trim()) return;
     setIsRefining(true);
@@ -393,7 +458,11 @@ export function DashboardTabs({
       });
       const result = await pollAgentJob(job_id);
       if (result.status === "failed") {
-        throw new Error(result.error ?? "Feedback agent job failed");
+        throw new Error(
+          result.stage
+            ? `Feedback agent job failed at ${result.stage}: ${result.error ?? "Unknown error"}`
+            : result.error ?? "Feedback agent job failed"
+        );
       }
       if (!result.payload) {
         throw new Error("Feedback agent did not return an updated payload");
@@ -779,6 +848,7 @@ export function DashboardTabs({
                 setDraftPayload((prev) => (prev ? { ...prev, issue_tracker: next } : prev));
                 setIsDirty(true);
               }}
+              onApplyEdit={saveIssueTrackerEdit}
             />
           ) : null}
 
